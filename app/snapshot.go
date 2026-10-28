@@ -11,6 +11,7 @@ import (
 	"github.com/hajimehoshi/ebiten/v2"
 
 	"gitea.littleherry.work/The78estWorld/go-screen-burn-in-fixer/actions"
+	"gitea.littleherry.work/The78estWorld/go-screen-burn-in-fixer/program"
 )
 
 // Snapshot 把各個畫面畫到離屏影像並存成 PNG（開發用）。不需要操作滑鼠鍵盤，
@@ -44,10 +45,12 @@ func (g *snapshotGame) Update() error {
 	a.frame = 90
 
 	menu := newMenuScene(a)
-	menu.focus = 2 // 第一個圖樣列：預覽框顯示 gray-noise
+	menu.focus = 4 // 第一個圖樣列（前面是模式、螢幕、順序、每段長度）：預覽框顯示 gray-noise
 
-	play := newPlayScene(a.cfg.Program(), a.cfg.Timer(), InfoAlways)
+	// 洗牌播放的資訊列（顯示這個圖樣在這一輪已播放的時間）。
+	play := newPlayScene(program.Shuffle(a.cfg.Program(), program.RandomSlice, 1, a.cfg.Timer()), a.cfg.Timer(), InfoAlways)
 	play.frame = 10
+	play.shift = 95 * time.Second
 
 	saverCfg := a.cfg
 	saverCfg.Mode = ModeScreensaver
@@ -57,35 +60,51 @@ func (g *snapshotGame) Update() error {
 	checkCfg.Mode = ModeCheck
 	checkCfg.CheckItems = append([]CheckItemConfig(nil), a.cfg.CheckItems...)
 	checkCfg.CheckItems[3].Seconds = Manual
-	checkCfg.Marks = []Mark{{X: 300, Y: 260}, {X: 720, Y: 480}}
+	checkCfg.MonitorMarks = map[string][]Mark{a.playKey(): {{X: 300, Y: 260}, {X: 720, Y: 480}}}
 	checkMenu := newMenuScene(a)
-	checkMenu.focus = 3 // 第一個檢查項目
+	checkMenu.focus = 2 // 「全部設為」：檢查反白範圍不會蓋住文字
 	check := newCheckScene(checkCfg.CheckSequence()[3:4], InfoAlways)
 	check.lastCursor = [2]int{560, 400}
 	check.cursorUntil = time.Now().Add(time.Minute)
+
+	// 多螢幕的選單：加上兩個假的螢幕示範勾選框，並選擇洗牌（只畫選單，不會真的播放）。
+	multiMons := append(append([]monitor(nil), a.monitors...),
+		monitor{short: "2：DELL U2720Q 3840×2160", tiny: "2：3840×2160", key: "fake-2"},
+		monitor{short: "3：LG 27GR95QE 2560×1440", tiny: "3：2560×1440", key: "fake-3"})
+	multiCfg := a.cfg
+	multiCfg.Monitors = []int{0, 2}
+	multiCfg.Shuffle = true
+	multiMenu := newMenuScene(a)
+	multiMenu.focus = 16 // 播放時間：示範直接輸入
+	multiMenu.editKey, multiMenu.editing = "timer", "2:30"
 
 	shots := []struct {
 		name  string
 		scene scene
 		cfg   Config
+		mons  []monitor
 	}{
-		{"warning", warningScene{}, a.cfg},
-		{"menu", menu, a.cfg},
-		{"menu-check", checkMenu, checkCfg},
-		{"menu-screensaver", newMenuScene(a), saverCfg},
-		{"play-hud", play, a.cfg},
-		{"check-hud", check, checkCfg},
-		{"countdown", newCountdownScene(actions.Shutdown, 60*time.Second), a.cfg},
-		{"screensaver", newSaverScene("drift-clock"), a.cfg},
+		{"warning", warningScene{}, a.cfg, nil},
+		{"menu", menu, a.cfg, nil},
+		{"menu-multi", multiMenu, multiCfg, multiMons},
+		{"menu-check", checkMenu, checkCfg, nil},
+		{"menu-screensaver", newMenuScene(a), saverCfg, nil},
+		{"play-hud", play, a.cfg, nil},
+		{"check-hud", check, checkCfg, nil},
+		{"countdown", newCountdownScene(actions.Shutdown, 60*time.Second), a.cfg, nil},
+		{"screensaver", newSaverScene("drift-clock"), a.cfg, nil},
 	}
 	img := ebiten.NewImage(WindowWidth, WindowHeight)
 	pix := make([]byte, 4*WindowWidth*WindowHeight)
 	for _, s := range shots {
-		orig := a.cfg
+		orig, origMons := a.cfg, a.monitors
 		a.cfg = s.cfg
+		if s.mons != nil {
+			a.monitors = s.mons
+		}
 		img.Clear()
 		s.scene.Draw(a, img)
-		a.cfg = orig
+		a.cfg, a.monitors = orig, origMons
 		img.ReadPixels(pix)
 		if err := savePNG(filepath.Join(g.dir, s.name+".png"), pix); err != nil {
 			g.err = err

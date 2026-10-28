@@ -30,7 +30,7 @@ func TestParseErrors(t *testing.T) {
 }
 
 func TestAt(t *testing.T) {
-	p := Program{{"gray-noise", 10 * time.Second}, {"vstripes", 5 * time.Second}}
+	p := Program{{Pattern: "gray-noise", Duration: 10 * time.Second}, {Pattern: "vstripes", Duration: 5 * time.Second}}
 	cases := []struct {
 		elapsed time.Duration
 		idx     int

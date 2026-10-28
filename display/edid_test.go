@@ -58,3 +58,82 @@ func TestParseEDIDErrors(t *testing.T) {
 		}
 	}
 }
+
+// withExtensions 在 sampleEDID 後加上擴充區塊並更新數量與檢查碼。
+func withExtensions(exts ...[]byte) []byte {
+	b := sampleEDID()
+	b[126] = byte(len(exts))
+	fixChecksum(b[:128])
+	for _, e := range exts {
+		fixChecksum(e)
+		b = append(b, e...)
+	}
+	return b
+}
+
+func fixChecksum(b []byte) {
+	var sum byte
+	for _, v := range b[:127] {
+		sum += v
+	}
+	b[127] = -sum
+}
+
+func le(v, n int) []byte {
+	out := make([]byte, n)
+	for i := range out {
+		out[i] = byte(v >> (8 * i))
+	}
+	return out
+}
+
+func TestParseEDIDExtensions(t *testing.T) {
+	// CTA-861：詳細時序 2560×1440@60（像素時脈 241.5 MHz，總畫面 2720×1481）。
+	cta := make([]byte, 128)
+	cta[0], cta[1], cta[2] = 0x02, 0x03, 4
+	d := cta[4:22]
+	copy(d[0:2], le(24150, 2))
+	d[2], d[3], d[4] = 0x00, 0xa0, 0xa0 // hActive 0xA00, hBlank 0x0A0
+	d[5], d[6], d[7] = 0xa0, 0x29, 0x50 // vActive 0x5A0, vBlank 0x029
+
+	// DisplayID 1.3：Type I 詳細時序 5120×1440@120（總畫面 5280×1490）。
+	did := make([]byte, 128)
+	did[0] = 0x70
+	sec := did[1:]
+	sec[0], sec[1] = 0x13, 3+20
+	blk := sec[4:]
+	blk[0], blk[1], blk[2] = 0x03, 0, 20
+	tm := blk[3:23]
+	clock := 5280 * 1490 * 120 / 10000
+	copy(tm[0:3], le(clock-1, 3))
+	copy(tm[4:6], le(5120-1, 2))
+	copy(tm[6:8], le(160-1, 2))
+	copy(tm[12:14], le(1440-1, 2))
+	copy(tm[14:16], le(50-1, 2))
+
+	info, err := ParseEDID(withExtensions(cta, did))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.Native.Width != 5120 || info.Native.Height != 1440 {
+		t.Errorf("Native = %v，預期 5120×1440", info.Native)
+	}
+	if hz := info.Native.RefreshHz; hz < 119.9 || hz > 120.1 {
+		t.Errorf("RefreshHz = %v，預期 120", hz)
+	}
+
+	info, err = ParseEDID(withExtensions(cta))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.Native.Width != 2560 || info.Native.Height != 1440 {
+		t.Errorf("只有 CTA 時 Native = %v，預期 2560×1440", info.Native)
+	}
+
+	// 檢查碼錯誤的擴充區塊略過，仍使用基本區塊。
+	b := withExtensions(cta)
+	b[200]++
+	if info, err := ParseEDID(b); err != nil || info.Native.Width != 1920 {
+		t.Errorf("壞掉的擴充區塊應略過: %v %v", info.Native, err)
+	}
+}

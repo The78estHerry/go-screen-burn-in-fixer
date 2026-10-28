@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"image/color"
 	"log"
+	"sort"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/hajimehoshi/ebiten/v2"
@@ -14,6 +16,7 @@ import (
 	"gitea.littleherry.work/The78estWorld/go-screen-burn-in-fixer/checks"
 	"gitea.littleherry.work/The78estWorld/go-screen-burn-in-fixer/internal/ui"
 	"gitea.littleherry.work/The78estWorld/go-screen-burn-in-fixer/patterns"
+	"gitea.littleherry.work/The78estWorld/go-screen-burn-in-fixer/program"
 	"gitea.littleherry.work/The78estWorld/go-screen-burn-in-fixer/screensaver"
 )
 
@@ -44,15 +47,16 @@ type menuScene struct {
 	previewImg *ebiten.Image
 	saverStart time.Time
 
-	startIdx      int    // 開始按鈕在 items 中的位置
-	levelsIdx     int    // 灰階分階階數列的位置（-1 代表不在畫面上）
-	editing       string // 正在輸入的階數
-	editingActive bool
-	defaultView   func(dst *ebiten.Image, frame int)
+	startIdx    int    // 開始按鈕在 items 中的位置
+	editKey     string // 正在輸入的列（numEdit.key）；空字串代表沒有在輸入
+	editing     string // 正在輸入的文字
+	editApply   func(string)
+	defaultView func(dst *ebiten.Image, frame int)
+	monCursor   int // 螢幕列中鍵盤所在的螢幕
 }
 
 func newMenuScene(a *App) *menuScene {
-	return &menuScene{focus: -1, hover: -1, levelsIdx: -1, saverStart: time.Now()}
+	return &menuScene{focus: -1, hover: -1, saverStart: time.Now()}
 }
 
 // ── 版面 ─────────────────────────────────────────────────
@@ -60,7 +64,6 @@ func newMenuScene(a *App) *menuScene {
 func (m *menuScene) items(a *App) []item {
 	cfg := &a.cfg
 	var items []item
-	m.levelsIdx = -1
 	m.defaultView = nil
 
 	items = append(items, m.modeRow(cfg), m.monitorRow(a))
@@ -121,33 +124,98 @@ func (m *menuScene) setMode(cfg *Config, mode Mode) {
 	if cfg.Mode != mode {
 		cfg.Mode = mode
 		m.errMsg = ""
-		m.editingActive = false
+		m.cancelEdit()
 	}
 }
 
+// monitorRow：只有一個螢幕時顯示它的說明；多個螢幕時每個螢幕一個勾選框，可以同時播放。
+// 鍵盤用 ←→ 選擇螢幕、空白鍵勾選。
 func (m *menuScene) monitorRow(a *App) item {
 	cfg := &a.cfg
-	cycle := func(dir int) func() {
+	const y = 122.0
+	row := ui.Rect{X: 20, Y: 116, W: 960, H: 34}
+	if len(a.monitors) <= 1 {
+		label := "（找不到螢幕）"
+		if len(a.monitors) == 1 {
+			label = a.monitors[0].label
+		}
+		return item{row: row, draw: func(p *painter, _, _ bool) {
+			p.text("螢幕", colLabel, y, 17, ui.ColorDim, ui.Left)
+			p.text(label, colValue, y, 17, ui.ColorText, ui.Left)
+		}}
+	}
+
+	// 螢幕名稱放不下時只顯示編號與解析度。
+	labels := make([]string, len(a.monitors))
+	width := 0.0
+	for i, mon := range a.monitors {
+		labels[i] = mon.short
+		w, _ := ui.Measure(mon.short, 17)
+		width += w + 60
+	}
+	if width > 960-colValue {
+		for i, mon := range a.monitors {
+			labels[i] = mon.tiny
+		}
+	}
+	m.monCursor = min(m.monCursor, len(a.monitors)-1)
+	toggle := func(i int) func() {
 		return func() {
-			if n := len(a.monitors); n > 0 {
-				cfg.Monitor = (cfg.Monitor + dir + n) % n
+			m.monCursor = i
+			cfg.Monitors = toggleMonitor(cfg.Monitors, i)
+		}
+	}
+	var clicks []clickArea
+	var draws []func(p *painter, focused bool)
+	x := colValue
+	for i := range a.monitors {
+		w, _ := ui.Measure(labels[i], 17)
+		bx := x
+		clicks = append(clicks, clickArea{ui.Rect{X: bx - 4, Y: y - 4, W: w + 36, H: 28}, toggle(i)})
+		draws = append(draws, func(p *painter, focused bool) {
+			checkbox(p, bx, y, contains(cfg.Monitors, i), false)
+			p.text(labels[i], bx+28, y, 17, ui.ColorText, ui.Left)
+			if focused && i == m.monCursor {
+				p.fill(ui.Rect{X: bx + 28, Y: y + 25, W: w, H: 2}, ui.ColorAccent)
 			}
-		}
+		})
+		x += w + 60
 	}
-	label := func() string {
-		if cfg.Monitor < len(a.monitors) {
-			return a.monitors[cfg.Monitor].label
-		}
-		return "（找不到螢幕）"
+	move := func(dir int) func() {
+		return func() { m.monCursor = (m.monCursor + dir + len(a.monitors)) % len(a.monitors) }
 	}
-	clicks, d := selector(colValue, 122, 760, label, cycle(-1), cycle(1), false)
 	return item{
-		row: ui.Rect{X: 20, Y: 116, W: 960, H: 34}, left: cycle(-1), right: cycle(1), clicks: clicks,
-		draw: func(p *painter, _, _ bool) {
-			p.text("螢幕", colLabel, 122, 17, ui.ColorDim, ui.Left)
-			d(p)
+		row: row, left: move(-1), right: move(1), clicks: clicks,
+		activate: func() { toggle(m.monCursor)() },
+		draw: func(p *painter, focused, _ bool) {
+			p.text("螢幕", colLabel, y, 17, ui.ColorDim, ui.Left)
+			for _, d := range draws {
+				d(p, focused)
+			}
 		},
 	}
+}
+
+// toggleMonitor 勾選或取消勾選螢幕 i（至少保留一個），回傳依編號排序的清單。
+// 編號最小的螢幕由主程式播放，其他螢幕各由一個子程式播放。
+func toggleMonitor(ms []int, i int) []int {
+	var out []int
+	found := false
+	for _, m := range ms {
+		if m == i {
+			found = true
+			continue
+		}
+		out = append(out, m)
+	}
+	if found && len(out) == 0 {
+		return ms
+	}
+	if !found {
+		out = append(out, i)
+	}
+	sort.Ints(out)
+	return out
 }
 
 // listRow 是圖樣或檢查項目清單中的一列：勾選框、名稱、說明、秒數選擇器。
@@ -184,6 +252,34 @@ func (m *menuScene) burnInItems(cfg *Config) []item {
 	saverOnly := cfg.Mode == ModeScreensaver
 	var items []item
 
+	// 順序：依序 / 洗牌 | 每段長度
+	{
+		const y = 178.0
+		seqC, seqW, seqD := radio(95, y, "依序", func() bool { return !cfg.Shuffle }, func() { cfg.Shuffle = false }, saverOnly)
+		shC, _, shD := radio(95+seqW, y, "洗牌", func() bool { return cfg.Shuffle }, func() { cfg.Shuffle = true }, saverOnly)
+		toggle := func() { cfg.Shuffle = !cfg.Shuffle }
+		items = append(items, item{
+			row: ui.Rect{X: 85, Y: y - 6, W: 190, H: 32}, left: toggle, right: toggle, activate: toggle,
+			clicks: []clickArea{seqC, shC}, disabled: saverOnly,
+			draw: func(p *painter, _, _ bool) {
+				seqD(p)
+				shD(p)
+			},
+		})
+
+		off := saverOnly || !cfg.Shuffle
+		dec := func() { cfg.ShuffleSlice = step(shuffleSliceChoices, cfg.ShuffleSlice, -1) }
+		inc := func() { cfg.ShuffleSlice = step(shuffleSliceChoices, cfg.ShuffleSlice, 1) }
+		clicks, d := selector(322, y, 140, func() string { return shuffleSliceLabel(cfg.ShuffleSlice) }, dec, inc, off)
+		items = append(items, item{
+			row: ui.Rect{X: 278, Y: y - 6, W: 188, H: 32}, left: dec, right: inc, clicks: clicks, disabled: off,
+			draw: func(p *painter, _, _ bool) {
+				p.text("每段", 285, y+2, 15, dimColor(off), ui.Left)
+				d(p)
+			},
+		})
+	}
+
 	for i := range cfg.Segments {
 		seg := &cfg.Segments[i]
 		pt, _ := patterns.Get(seg.Pattern)
@@ -210,14 +306,35 @@ func (m *menuScene) burnInItems(cfg *Config) []item {
 	// 播放時間 | 資訊列
 	{
 		y := rowBottom1
-		dec := func() { cfg.TimerMinutes = step(timerMinutesChoices, cfg.TimerMinutes, -1) }
-		inc := func() { cfg.TimerMinutes = step(timerMinutesChoices, cfg.TimerMinutes, 1) }
-		clicks, d := selector(colValue, y, 200, func() string { return fmt.Sprintf("%d 分鐘", cfg.TimerMinutes) }, dec, inc, saverOnly)
+		dec := func() { m.commitEdit(); cfg.TimerMinutes = stepSorted(timerMinutesChoices, cfg.TimerMinutes, -1) }
+		inc := func() { m.commitEdit(); cfg.TimerMinutes = stepSorted(timerMinutesChoices, cfg.TimerMinutes, 1) }
+		value := func() string {
+			if m.editKey == "timer" {
+				return m.editing + "▏"
+			}
+			return formatMinutes(cfg.TimerMinutes)
+		}
+		clicks, d := selector(colValue, y, 200, value, dec, inc, saverOnly)
 		items = append(items, item{
 			row: ui.Rect{X: 20, Y: y - 6, W: 430, H: 34}, left: dec, right: inc, clicks: clicks, disabled: saverOnly,
-			draw: func(p *painter, _, _ bool) {
+			edit: &numEdit{
+				key: "timer",
+				accept: func(buf string, r rune) bool {
+					return len(buf) < 6 && (r >= '0' && r <= '9' || strings.ContainsRune(":hHmM", r))
+				},
+				apply: func(buf string) {
+					if n, ok := parseTimerInput(buf); ok {
+						cfg.TimerMinutes = min(n, MaxTimerMinutes)
+					}
+				},
+				hint: fmt.Sprintf("可直接輸入：90（分鐘）、3h（小時）、2:30（時:分），最長 %d 小時", MaxTimerMinutes/60),
+			},
+			draw: func(p *painter, focused, _ bool) {
 				p.text("播放時間", colLabel, y, 17, dimColor(saverOnly), ui.Left)
 				d(p)
+				if focused {
+					p.text("可直接輸入", colValue+210, y+3, 13, ui.ColorDim, ui.Left)
+				}
 			},
 		})
 		items = append(items, infoBarRow(cfg, y, saverOnly))
@@ -313,6 +430,14 @@ func (m *menuScene) burnInItems(cfg *Config) []item {
 	return items
 }
 
+// shuffleSliceLabel 回傳洗牌每段長度的說明。
+func shuffleSliceLabel(sec int) string {
+	if sec == program.RandomSlice {
+		return fmt.Sprintf("%d–%d 秒", int(program.MinRandomSlice.Seconds()), int(program.MaxRandomSlice.Seconds()))
+	}
+	return formatSeconds(sec)
+}
+
 // infoBarRow：資訊列顯示設定（Burn-In 與檢查模式共用，位置相同）。
 func infoBarRow(cfg *Config, y float64, disabled bool) item {
 	dec := func() { cfg.InfoBar = stepAny(infoBarChoices, cfg.InfoBar, -1) }
@@ -375,7 +500,7 @@ func (m *menuScene) checkItems(cfg *Config) []item {
 			}
 		}
 		items = append(items, item{
-			row: ui.Rect{X: 190, Y: 172, W: 420, H: 32}, left: toggle, right: toggle, clicks: []clickArea{autoC, manC},
+			row: ui.Rect{X: 168, Y: 172, W: 290, H: 32}, left: toggle, right: toggle, clicks: []clickArea{autoC, manC},
 			draw: func(p *painter, _, _ bool) {
 				p.text("全部設為", 180, 178, 15, ui.ColorDim, ui.Left)
 				autoD(p)
@@ -415,10 +540,10 @@ func (m *menuScene) checkItems(cfg *Config) []item {
 	// 灰階分階階數 | 資訊列
 	{
 		y := rowBottom1
-		dec := func() { m.commitLevels(cfg); cfg.GrayLevels = stepLevels(cfg.GrayLevels, -1) }
-		inc := func() { m.commitLevels(cfg); cfg.GrayLevels = stepLevels(cfg.GrayLevels, 1) }
+		dec := func() { m.commitEdit(); cfg.GrayLevels = stepLevels(cfg.GrayLevels, -1) }
+		inc := func() { m.commitEdit(); cfg.GrayLevels = stepLevels(cfg.GrayLevels, 1) }
 		value := func() string {
-			if m.editingActive {
+			if m.editKey == "levels" {
 				return m.editing + "▏ 階"
 			}
 			return fmt.Sprintf("%d 階", cfg.GrayLevels)
@@ -428,9 +553,18 @@ func (m *menuScene) checkItems(cfg *Config) []item {
 		if gs, ok := checks.Get("gray-steps"); ok {
 			preview = checkPreview(gs, cfg)
 		}
-		m.levelsIdx = len(items) + 2 // 前面還有模式、螢幕兩列
 		items = append(items, item{
 			row: ui.Rect{X: 20, Y: y - 6, W: 430, H: 34}, left: dec, right: inc, clicks: clicks, preview: preview,
+			edit: &numEdit{
+				key:    "levels",
+				accept: func(buf string, r rune) bool { return r >= '0' && r <= '9' && len(buf) < 3 },
+				apply: func(buf string) {
+					if n, err := strconv.Atoi(buf); err == nil {
+						cfg.GrayLevels = checks.ClampGrayLevels(n)
+					}
+				},
+				hint: fmt.Sprintf("灰階分階可直接輸入 %d–%d；Enter 確定", checks.MinGrayLevels, checks.MaxGrayLevels),
+			},
 			draw: func(p *painter, focused, _ bool) {
 				p.text("灰階分階", colLabel, y, 17, ui.ColorDim, ui.Left)
 				d(p)
@@ -445,10 +579,10 @@ func (m *menuScene) checkItems(cfg *Config) []item {
 	// 標記
 	{
 		y := rowBottom2
-		items = append(items, button(ui.Rect{X: colValue + 170, Y: y - 6, W: 150, H: 32}, "清除全部標記", false, func() { cfg.Marks = nil }, len(cfg.Marks) == 0))
+		items = append(items, button(ui.Rect{X: colValue + 170, Y: y - 6, W: 150, H: 32}, "清除全部標記", false, func() { cfg.ClearMarks() }, cfg.MarkCount() == 0))
 		items[len(items)-1].draw = wrapDraw(items[len(items)-1].draw, func(p *painter) {
 			p.text("標記", colLabel, y, 17, ui.ColorDim, ui.Left)
-			p.text(fmt.Sprintf("已有 %d 個", len(cfg.Marks)), colValue, y, 17, ui.ColorText, ui.Left)
+			p.text(fmt.Sprintf("已有 %d 個", cfg.MarkCount()), colValue, y, 17, ui.ColorText, ui.Left)
 		})
 	}
 	return items
@@ -472,8 +606,11 @@ func checkSecondsLabel(sec, steps int) string {
 }
 
 // stepLevels 把灰階階數切換到前一個 / 下一個常用值。
-func stepLevels(v, dir int) int {
-	cs := checks.GrayLevelChoices
+func stepLevels(v, dir int) int { return stepSorted(checks.GrayLevelChoices, v, dir) }
+
+// stepSorted 回傳遞增的 cs 中比 v 大（dir > 0）或比 v 小（dir < 0）的下一個值，到頭時停住；
+// v 可以是不在 cs 中的值（直接輸入的數值）。
+func stepSorted(cs []int, v, dir int) int {
 	if dir > 0 {
 		for _, c := range cs {
 			if c > v {
@@ -500,21 +637,65 @@ func stepAny(choices []int, v, dir int) int {
 	return choices[0]
 }
 
-// commitLevels 套用正在輸入的階數。
-func (m *menuScene) commitLevels(cfg *Config) {
-	if !m.editingActive {
-		return
+// commitEdit 套用正在輸入的數值。
+func (m *menuScene) commitEdit() {
+	if m.editKey != "" && m.editApply != nil {
+		m.editApply(m.editing)
 	}
-	if n, err := strconv.Atoi(m.editing); err == nil {
-		cfg.GrayLevels = checks.ClampGrayLevels(n)
+	m.cancelEdit()
+}
+
+// cancelEdit 放棄正在輸入的數值。
+func (m *menuScene) cancelEdit() {
+	m.editKey, m.editing, m.editApply = "", "", nil
+}
+
+// formatMinutes 把播放時間格式化成「N 分鐘」「N 小時」「N 小時 M 分」。
+func formatMinutes(min int) string {
+	switch {
+	case min < 60:
+		return fmt.Sprintf("%d 分鐘", min)
+	case min%60 == 0:
+		return fmt.Sprintf("%d 小時", min/60)
 	}
-	m.editingActive, m.editing = false, ""
+	return fmt.Sprintf("%d 小時 %d 分", min/60, min%60)
+}
+
+// parseTimerInput 解析直接輸入的播放時間，回傳分鐘數：
+// "90"（分鐘）、"3h"（小時）、"2:30"（小時:分）、"2h30" 或 "2h30m"、"45m"。
+func parseTimerInput(s string) (int, bool) {
+	s = strings.ToLower(strings.TrimSpace(s))
+	atoi := func(t string) (int, bool) {
+		if t == "" {
+			return 0, true
+		}
+		n, err := strconv.Atoi(t)
+		return n, err == nil && n >= 0
+	}
+	var h, m int
+	var ok1, ok2 bool
+	switch {
+	case strings.Contains(s, ":"):
+		hs, ms, _ := strings.Cut(s, ":")
+		h, ok1 = atoi(hs)
+		m, ok2 = atoi(ms)
+	case strings.Contains(s, "h"):
+		hs, ms, _ := strings.Cut(s, "h")
+		h, ok1 = atoi(hs)
+		m, ok2 = atoi(strings.TrimSuffix(ms, "m"))
+		ok1 = ok1 && hs != ""
+	default:
+		m, ok2 = atoi(strings.TrimSuffix(s, "m"))
+		ok1 = s != "" && s != "m"
+	}
+	total := h*60 + m
+	return total, ok1 && ok2 && total > 0
 }
 
 // ── 互動 ─────────────────────────────────────────────────
 
 func (m *menuScene) start(a *App) {
-	m.commitLevels(&a.cfg)
+	m.commitEdit()
 	switch a.cfg.Mode {
 	case ModeBurnIn:
 		if len(a.cfg.Program()) == 0 {
@@ -542,8 +723,8 @@ func (m *menuScene) start(a *App) {
 
 func (m *menuScene) Update(a *App) error {
 	if m.quit || inpututil.IsKeyJustPressed(ebiten.KeyEscape) {
-		if m.editingActive { // 輸入中按 Esc 只取消輸入
-			m.editingActive, m.editing = false, ""
+		if m.editKey != "" { // 輸入中按 Esc 只取消輸入
+			m.cancelEdit()
 			m.quit = false
 			return nil
 		}
@@ -557,7 +738,7 @@ func (m *menuScene) Update(a *App) error {
 		m.errMsg = ""
 	}
 	moveFocus := func(dir int) {
-		m.commitLevels(&a.cfg)
+		m.commitEdit()
 		for i := 1; i <= len(items); i++ {
 			j := (m.focus + dir*i + len(items)) % len(items)
 			if !items[j].disabled {
@@ -570,15 +751,23 @@ func (m *menuScene) Update(a *App) error {
 		moveFocus(1)
 	}
 
-	// 灰階分階階數：焦點在這一列時可以直接輸入數字
-	if m.focus == m.levelsIdx {
+	// 可以直接輸入數值的列（播放時間、灰階分階階數）
+	if e := items[m.focus].edit; e != nil {
 		for _, r := range ebiten.AppendInputChars(nil) {
-			if r >= '0' && r <= '9' && len(m.editing) < 3 {
-				m.editing += string(r)
-				m.editingActive = true
+			buf := ""
+			if m.editKey == e.key {
+				buf = m.editing
 			}
+			if !e.accept(buf, r) {
+				continue
+			}
+			if m.editKey != e.key {
+				m.commitEdit()
+				m.editKey, m.editApply = e.key, e.apply
+			}
+			m.editing += string(r)
 		}
-		if m.editingActive && keyRepeat(ebiten.KeyBackspace) && len(m.editing) > 0 {
+		if m.editKey == e.key && keyRepeat(ebiten.KeyBackspace) && len(m.editing) > 0 {
 			m.editing = m.editing[:len(m.editing)-1]
 		}
 	}
@@ -602,8 +791,8 @@ func (m *menuScene) Update(a *App) error {
 			f()
 		}
 	case inpututil.IsKeyJustPressed(ebiten.KeyEnter) || inpututil.IsKeyJustPressed(ebiten.KeyNumpadEnter):
-		if m.editingActive { // 輸入中按 Enter 只確定數字
-			m.commitLevels(&a.cfg)
+		if m.editKey != "" { // 輸入中按 Enter 只確定數值
+			m.commitEdit()
 		} else {
 			m.start(a)
 		}
@@ -628,7 +817,7 @@ func (m *menuScene) Update(a *App) error {
 			for _, c := range it.clicks {
 				if c.r.Contains(mx, my) {
 					if i != m.focus {
-						m.commitLevels(&a.cfg)
+						m.commitEdit()
 					}
 					m.focus = i
 					c.fn()
@@ -637,7 +826,7 @@ func (m *menuScene) Update(a *App) error {
 			}
 			if it.row.Contains(mx, my) {
 				if i != m.focus {
-					m.commitLevels(&a.cfg)
+					m.commitEdit()
 				}
 				m.focus = i
 				if it.isButton && it.activate != nil {
@@ -670,11 +859,15 @@ func (m *menuScene) Draw(a *App, screen *ebiten.Image) {
 	switch cfg.Mode {
 	case ModeCheck:
 		p.text("檢查項目", colLabel, 178, 17, ui.ColorDim, ui.Left)
-		p.text("每階秒數", secondsX+75, 194, 13, ui.ColorDim, ui.Center)
+		p.text("每階秒數", secondsX+75, 180, 15, ui.ColorDim, ui.Center)
 	default:
 		hdr := dimColor(cfg.Mode == ModeScreensaver)
-		p.text("圖樣（依序輪播）", colLabel, 178, 17, hdr, ui.Left)
-		p.text("每段秒數", secondsX+75, 180, 15, hdr, ui.Center)
+		p.text("圖樣", colLabel, 178, 17, hdr, ui.Left)
+		col := "每段秒數"
+		if cfg.Shuffle {
+			col = "每輪秒數"
+		}
+		p.text(col, secondsX+75, 180, 15, hdr, ui.Center)
 	}
 	p.fill(ui.Rect{X: 20, Y: 530, W: 960, H: 1}, ui.ColorBorder)
 
@@ -696,18 +889,25 @@ func (m *menuScene) Draw(a *App, screen *ebiten.Image) {
 	switch cfg.Mode {
 	case ModeBurnIn:
 		total := cfg.Program().Total()
-		p.text(fmt.Sprintf("一輪合計 %s，共 %d 個圖樣", formatDuration(total), len(cfg.Program())), previewX, 432, 15, ui.ColorDim, ui.Left)
+		sum := fmt.Sprintf("一輪合計 %s，共 %d 個圖樣", formatDuration(total), len(cfg.Program()))
+		if cfg.Shuffle {
+			sum += "，洗牌"
+		}
+		p.text(sum, previewX, 432, 15, ui.ColorDim, ui.Left)
 	case ModeCheck:
 		p.text(checkSummary(cfg.CheckSequence()), previewX, 432, 15, ui.ColorDim, ui.Left)
 	}
 	if m.errMsg != "" {
 		p.text(m.errMsg, colLabel, 652, 17, ui.ColorError, ui.Left)
 	}
-	hint := "↑↓ 選擇　←→ 調整　空白鍵 勾選"
+	hint, hintColor := "↑↓ 選擇　←→ 調整　空白鍵 勾選", color.Color(ui.ColorBorder)
 	if cfg.Mode == ModeCheck {
 		hint = "檢查時：Enter／空白鍵 下一階　← 上一階　Esc 取消　點一下 標記"
 	}
-	p.text(hint, colLabel, 684, 13, ui.ColorBorder, ui.Left)
+	if e := items[focus].edit; e != nil && !items[focus].disabled {
+		hint, hintColor = e.hint, ui.ColorDim
+	}
+	p.text(hint, colLabel, 684, 13, hintColor, ui.Left)
 	m.drawPreview(a, p, items, focus)
 }
 

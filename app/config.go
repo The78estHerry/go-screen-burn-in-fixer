@@ -5,6 +5,8 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"strconv"
+	"strings"
 	"time"
 
 	"gitea.littleherry.work/The78estWorld/go-screen-burn-in-fixer/actions"
@@ -63,16 +65,22 @@ type SegmentConfig struct {
 // Config 是使用者設定，存在 exe 旁邊的 go-screen-burn-in-fixer.json。
 type Config struct {
 	Mode         Mode            `json:"mode"`
-	Monitor      int             `json:"monitor"`
+	Monitors     []int           `json:"monitors"` // 要播放的螢幕（從 0 開始，依選單中的順序）
 	Segments     []SegmentConfig `json:"segments"`
+	Shuffle      bool            `json:"shuffle"`      // Burn-In 圖樣洗牌播放
+	ShuffleSlice int             `json:"shuffleSlice"` // 洗牌時每段的秒數；program.RandomSlice（0）代表隨機
 	TimerMinutes int             `json:"timerMinutes"`
 	After        actions.After   `json:"after"`
 	Screensaver  string          `json:"screensaver"`
 	SaverExit    SaverExit       `json:"saverExit"`
 
-	CheckItems []CheckItemConfig `json:"checkItems"`
-	GrayLevels int               `json:"grayLevels"` // 灰階分階的階數
-	Marks      []Mark            `json:"marks"`
+	CheckItems   []CheckItemConfig `json:"checkItems"`
+	GrayLevels   int               `json:"grayLevels"`   // 灰階分階的階數
+	MonitorMarks map[string][]Mark `json:"monitorMarks"` // 每個螢幕的標記，以 monitor.key 區分
+
+	// 舊版設定檔的欄位（單一螢幕）：讀取後轉換成 Monitors、MonitorMarks。
+	LegacyMonitor int    `json:"monitor,omitempty"`
+	LegacyMarks   []Mark `json:"marks,omitempty"`
 
 	InfoBar int `json:"infoBar"` // 資訊列：InfoHidden、InfoAlways 或顯示秒數
 }
@@ -80,10 +88,14 @@ type Config struct {
 // 選單中可選擇的數值。
 var (
 	segmentSecondsChoices = []int{10, 15, 20, 30, 45, 60, 90, 120, 180, 300, 600}
-	timerMinutesChoices   = []int{5, 10, 15, 20, 30, 45, 50, 60, 90, 120, 180, 240}
+	timerMinutesChoices   = []int{5, 10, 15, 20, 30, 45, 50, 60, 90, 120, 180, 240, 300, 360, 480, 600, 720, 1440}
 	checkSecondsChoices   = []int{Manual, 5, 10, 15, 20, 30, 45, 60, 120}
 	infoBarChoices        = []int{InfoHidden, 3, 5, 10, InfoAlways}
+	shuffleSliceChoices   = []int{program.RandomSlice, 10, 20, 30, 60}
 )
+
+// MaxTimerMinutes 是播放時間的上限（選單可以直接輸入任意分鐘數）。
+const MaxTimerMinutes = 72 * 60
 
 // DefaultCheckSeconds 是檢查項目「自動」時的預設秒數。
 const DefaultCheckSeconds = 10
@@ -93,6 +105,7 @@ const DefaultCheckSeconds = 10
 func DefaultConfig() Config {
 	c := Config{
 		Mode:         ModeBurnIn,
+		Monitors:     []int{0},
 		TimerMinutes: 50,
 		After:        actions.Screensaver,
 		Screensaver:  screensaver.All()[0].Name(),
@@ -178,10 +191,24 @@ func (c *Config) normalize() {
 	if c.SaverExit != SaverExitMenu && c.SaverExit != SaverExitQuit {
 		c.SaverExit = def.SaverExit
 	}
-	c.TimerMinutes = nearest(timerMinutesChoices, c.TimerMinutes)
-	if c.Monitor < 0 {
-		c.Monitor = 0
+	if c.TimerMinutes <= 0 || c.TimerMinutes > MaxTimerMinutes {
+		c.TimerMinutes = def.TimerMinutes
 	}
+	c.ShuffleSlice = nearest(shuffleSliceChoices, c.ShuffleSlice)
+	if c.LegacyMonitor > 0 && (len(c.Monitors) == 0 || len(c.Monitors) == 1 && c.Monitors[0] == 0) {
+		c.Monitors = []int{c.LegacyMonitor}
+	}
+	c.LegacyMonitor = 0
+	var mons []int
+	for _, m := range c.Monitors {
+		if m >= 0 && !contains(mons, m) {
+			mons = append(mons, m)
+		}
+	}
+	if len(mons) == 0 {
+		mons = []int{0}
+	}
+	c.Monitors = mons
 
 	// 依目前註冊的圖樣重建清單：保留使用者的勾選與秒數，移除已不存在的圖樣。
 	old := map[string]SegmentConfig{}
@@ -208,6 +235,20 @@ func (c Config) Program() program.Program {
 		}
 	}
 	return p
+}
+
+// MarkCount 回傳所有螢幕的標記總數。
+func (c Config) MarkCount() int {
+	n := len(c.LegacyMarks)
+	for _, ms := range c.MonitorMarks {
+		n += len(ms)
+	}
+	return n
+}
+
+// ClearMarks 清除所有螢幕的標記。
+func (c *Config) ClearMarks() {
+	c.MonitorMarks, c.LegacyMarks = nil, nil
 }
 
 // Timer 回傳播放時間。
@@ -245,6 +286,22 @@ func (c Config) CheckSequence() []CheckStep {
 		}
 	}
 	return seq
+}
+
+// CheckSpec 回傳勾選的檢查項目，格式與 -check 參數相同（例如 "gray-field:10,white:manual"）。
+func (c Config) CheckSpec() string {
+	var parts []string
+	for _, it := range c.CheckItems {
+		if !it.Enabled {
+			continue
+		}
+		sec := "manual"
+		if it.Seconds != Manual {
+			sec = strconv.Itoa(it.Seconds)
+		}
+		parts = append(parts, it.Check+":"+sec)
+	}
+	return strings.Join(parts, ",")
 }
 
 func contains(choices []int, v int) bool {

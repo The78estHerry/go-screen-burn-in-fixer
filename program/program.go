@@ -1,4 +1,4 @@
-// Package program 定義節目表：依序播放的圖樣與各自的秒數，播完一輪後循環。
+// Package program 定義節目表：依序（或洗牌後）播放的圖樣與各自的秒數，播完一輪後循環。
 package program
 
 import (
@@ -18,6 +18,10 @@ const DefaultSegment = 60 * time.Second
 type Segment struct {
 	Pattern  string
 	Duration time.Duration
+
+	// 洗牌後的段落才有：這個圖樣在這一輪中、這一段之前已播放的時間，以及一輪中的總時間。
+	Played       time.Duration
+	PatternTotal time.Duration
 }
 
 // Program 是依序播放、循環的節目表。

@@ -35,6 +35,15 @@ type item struct {
 	preview  func(dst *ebiten.Image, frame int) // 焦點或滑鼠在這一列時，預覽框顯示的內容
 	draw     func(p *painter, focused, hovered bool)
 	isButton bool
+	edit     *numEdit // 焦點在這一列時可以直接用鍵盤輸入數值
+}
+
+// numEdit 描述可以直接輸入的數值：輸入中的文字由 menuScene 保存，Enter、移開焦點或按 ◀▶ 時套用。
+type numEdit struct {
+	key    string                        // 區分是哪一列在輸入
+	accept func(buf string, r rune) bool // 是否接受再輸入這個字元
+	apply  func(buf string)              // 套用輸入的文字（無效時不改變）
+	hint   string                        // 焦點在這一列時，畫面下方的說明
 }
 
 // painter 把邏輯座標轉成畫面座標後繪製。

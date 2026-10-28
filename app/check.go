@@ -5,6 +5,7 @@ import (
 	"image/color"
 	"log"
 	"math"
+	"strconv"
 	"time"
 
 	"github.com/hajimehoshi/ebiten/v2"
@@ -75,17 +76,16 @@ func (s *checkScene) Update(a *App) error {
 	s.info.update()
 	switch {
 	case inpututil.IsKeyJustPressed(ebiten.KeyEscape):
-		return s.finish(a, true)
+		return s.command(a, "esc")
 	case inpututil.IsKeyJustPressed(ebiten.KeyEnter), inpututil.IsKeyJustPressed(ebiten.KeyNumpadEnter),
 		inpututil.IsKeyJustPressed(ebiten.KeySpace):
-		if s.idx+1 >= len(s.seq) {
-			return s.finish(a, false)
+		if err := s.command(a, "next"); err != nil || a.scene != s {
+			return err
 		}
-		s.goTo(s.idx + 1)
 	case inpututil.IsKeyJustPressed(ebiten.KeyLeft):
-		s.goTo(max(s.idx-1, 0))
+		s.command(a, "prev")
 	case inpututil.IsKeyJustPressed(ebiten.KeyC):
-		a.cfg.Marks = nil
+		a.setMarks(nil)
 	case inpututil.IsKeyJustPressed(ebiten.KeyM):
 		s.marksHidden = !s.marksHidden
 	}
@@ -101,11 +101,55 @@ func (s *checkScene) Update(a *App) error {
 		s.cursorUntil = time.Now().Add(crosshairDuration)
 	}
 
-	if d := s.stepDuration(); d > 0 && time.Since(s.stepStart) >= d {
+	// 多螢幕時只由主程式計時，子程式跟著主程式換階。
+	if d := s.stepDuration(); a.up == nil && d > 0 && time.Since(s.stepStart) >= d {
+		return s.command(a, "next")
+	}
+	return nil
+}
+
+// command 執行換階指令。子程式把指令交給主程式；主程式執行後把目前的階送給所有子程式。
+func (s *checkScene) command(a *App, cmd string) error {
+	if a.up != nil {
+		a.up.send(cmd)
+		return nil
+	}
+	switch cmd {
+	case "esc":
+		return s.finish(a, true)
+	case "next":
 		if s.idx+1 >= len(s.seq) {
 			return s.finish(a, false)
 		}
 		s.goTo(s.idx + 1)
+	case "prev":
+		s.goTo(max(s.idx-1, 0))
+	default:
+		return nil
+	}
+	s.sync(a)
+	return nil
+}
+
+// sync 把目前的階與已顯示的時間送給所有子程式（殘影測試依時間切換畫面）。
+func (s *checkScene) sync(a *App) {
+	a.broadcast("step %d %d", s.idx, int64(time.Since(s.stepStart)))
+}
+
+func (s *checkScene) remote(a *App, cmd string, args []string) error {
+	if a.up == nil { // 主程式：子程式回報的按鍵
+		return s.command(a, cmd)
+	}
+	if cmd == "step" && len(args) == 2 {
+		idx, err1 := strconv.Atoi(args[0])
+		el, err2 := strconv.ParseInt(args[1], 10, 64)
+		if err1 != nil || err2 != nil || idx < 0 || idx >= len(s.seq) {
+			return nil
+		}
+		if idx != s.idx {
+			s.goTo(idx)
+		}
+		s.stepStart = time.Now().Add(-time.Duration(el))
 	}
 	return nil
 }
@@ -113,13 +157,14 @@ func (s *checkScene) Update(a *App) error {
 // toggleMark 在游標位置新增標記；點在既有標記上則移除它。
 func (s *checkScene) toggleMark(a *App, x, y int) {
 	r := markRadius(a.screenH) * 1.5
-	for i, mk := range a.cfg.Marks {
+	marks := a.marks()
+	for i, mk := range marks {
 		if math.Hypot(float64(mk.X-x), float64(mk.Y-y)) <= r {
-			a.cfg.Marks = append(a.cfg.Marks[:i], a.cfg.Marks[i+1:]...)
+			a.setMarks(append(marks[:i:i], marks[i+1:]...))
 			return
 		}
 	}
-	a.cfg.Marks = append(a.cfg.Marks, Mark{X: x, Y: y})
+	a.setMarks(append(marks[:len(marks):len(marks)], Mark{X: x, Y: y}))
 	s.marksHidden = false
 }
 
@@ -135,7 +180,7 @@ func (s *checkScene) Draw(a *App, screen *ebiten.Image) {
 	h := screen.Bounds().Dy()
 	if !s.marksHidden {
 		r := float32(markRadius(h))
-		for _, mk := range a.cfg.Marks {
+		for _, mk := range a.marks() {
 			// 黑色外圈加白色內圈：在任何背景上都看得到，中間保持空白不擋住瑕疵。
 			vector.StrokeCircle(screen, float32(mk.X), float32(mk.Y), r, 4, color.Black, true)
 			vector.StrokeCircle(screen, float32(mk.X), float32(mk.Y), r, 1.5, color.White, true)
@@ -157,7 +202,7 @@ func (s *checkScene) Draw(a *App, screen *ebiten.Image) {
 		lines = append(lines, sv.Status(st.Step, t))
 	}
 	lines = append(lines, st.Check.Hint(),
-		fmt.Sprintf("座標 (%d, %d)　標記 %d 個", s.lastCursor[0], s.lastCursor[1], len(a.cfg.Marks)),
+		fmt.Sprintf("座標 (%d, %d)　標記 %d 個", s.lastCursor[0], s.lastCursor[1], len(a.marks())),
 		"Enter／空白鍵 下一階　← 上一階　Esc 取消　點一下 標記／取消標記　C 清除標記　M 隱藏標記　H 資訊列　按住 S 顯示")
 	s.info.draw(screen, lines...)
 }

@@ -6,6 +6,7 @@ package app
 import (
 	"fmt"
 	"log"
+	"math/rand/v2"
 	"time"
 
 	"github.com/hajimehoshi/ebiten/v2"
@@ -32,6 +33,8 @@ type Options struct {
 	Windowed   bool            // 以視窗模式播放（開發測試用）
 	DryRun     bool            // 倒數結束時不真的關機 / 睡眠
 	Countdown  time.Duration   // 關機 / 睡眠前的倒數時間
+	Child      bool            // 多螢幕播放的子程式：只負責顯示，由主程式控制（見 multi.go）
+	Seed       uint64          // 洗牌的亂數種子；0 代表每次播放隨機產生
 }
 
 type scene interface {
@@ -42,7 +45,10 @@ type scene interface {
 // monitor 是選單中可選擇的螢幕。
 type monitor struct {
 	m     *ebiten.MonitorType
-	label string
+	label string // 完整說明（只有一個螢幕時顯示）
+	short string // 簡短說明（多個螢幕並排時顯示）
+	tiny  string // 最短的說明：編號與解析度（螢幕名稱放不下時）
+	key   string // 識別字串：標記依此分開儲存
 }
 
 // App 實作 ebiten.Game。
@@ -54,15 +60,25 @@ type App struct {
 	monitors []monitor
 	screenW  int
 	screenH  int
+
+	playMon int     // 這個程式播放的螢幕（cfg.Monitors 的第一個）
+	seed    uint64  // 這次播放的洗牌種子，傳給子程式
+	hub     *hub    // 主程式：多螢幕播放中的子程式
+	up      *upLink // 子程式：與主程式的連線
 }
 
 // New 建立程式主體。
 func New(opts Options) *App {
-	a := &App{opts: opts, cfg: opts.Config}
+	a := &App{opts: opts, cfg: opts.Config, seed: opts.Seed}
+	if opts.Child {
+		a.up = newUpLink()
+	}
 	a.refreshMonitors()
 	switch {
 	case opts.SkipMenu && a.cfg.Mode == ModeCheck:
 		a.goCheck(a.cfg.CheckSequence())
+	case opts.SkipMenu && a.cfg.Mode == ModeScreensaver:
+		a.goSaver()
 	case opts.SkipMenu:
 		a.goPlay(opts.Program, opts.Timer)
 	default:
@@ -76,6 +92,14 @@ func (a *App) Config() Config { return a.cfg }
 
 func (a *App) Update() error {
 	a.frame++
+	if a.up != nil {
+		if err := a.pollParent(); err != nil {
+			return err
+		}
+	}
+	if err := a.pollChildren(); err != nil {
+		return err
+	}
 	return a.scene.Update(a)
 }
 
@@ -103,20 +127,51 @@ func (a *App) refreshMonitors() {
 		w, h := m.Size()
 		s := m.DeviceScaleFactor()
 		pw, ph := int(float64(w)*s+0.5), int(float64(h)*s+0.5)
-		label := fmt.Sprintf("%d：%d×%d", i+1, pw, ph)
+		mon := monitor{m: m, label: fmt.Sprintf("%d：%d×%d", i+1, pw, ph), key: monitorKey(i, "")}
+		mon.short, mon.tiny = mon.label, mon.label
 		// Ebitengine 與作業系統都把主螢幕排在第一個；依序找解析度相同、尚未對應的顯示器。
 		for j, d := range ds {
 			if !used[j] && d.Current.Width == pw && d.Current.Height == ph {
 				used[j] = true
-				label = fmt.Sprintf("%d：%s", i+1, d.Label())
+				mon.label = fmt.Sprintf("%d：%s", i+1, d.Label())
+				if d.FriendlyName != "" {
+					mon.short = fmt.Sprintf("%d：%s %d×%d", i+1, d.FriendlyName, pw, ph)
+				}
+				mon.key = monitorKey(i, d.DeviceName+" "+d.FriendlyName)
 				break
 			}
 		}
-		a.monitors = append(a.monitors, monitor{m: m, label: label})
+		a.monitors = append(a.monitors, mon)
 	}
-	if a.cfg.Monitor >= len(a.monitors) {
-		a.cfg.Monitor = 0
+
+	// 移除已經不存在的螢幕；全部都不存在時改用主螢幕。
+	if len(a.monitors) > 0 {
+		var keep []int
+		for _, m := range a.cfg.Monitors {
+			if m < len(a.monitors) {
+				keep = append(keep, m)
+			}
+		}
+		if len(keep) == 0 {
+			keep = []int{0}
+		}
+		a.cfg.Monitors = keep
 	}
+	a.playMon = a.cfg.Monitors[0]
+
+	// 舊版設定檔的標記屬於當時選擇的螢幕。
+	if len(a.cfg.LegacyMarks) > 0 {
+		a.setMarksFor(a.playKey(), append(a.marks(), a.cfg.LegacyMarks...))
+		a.cfg.LegacyMarks = nil
+	}
+}
+
+// monitorKey 回傳螢幕的識別字串：有作業系統的裝置名稱時用裝置名稱，否則用順序。
+func monitorKey(i int, device string) string {
+	if device != "" && device != " " {
+		return device
+	}
+	return fmt.Sprintf("monitor-%d", i+1)
 }
 
 // setWindowMode 切換成一般視窗（警告畫面、設定選單）。
@@ -128,9 +183,10 @@ func (a *App) setWindowMode() {
 
 // setPlayMode 切換成在選定螢幕上全螢幕播放，並防止螢幕關閉。
 func (a *App) setPlayMode() {
+	a.playMon = a.cfg.Monitors[0]
 	if !a.opts.Windowed {
-		if a.cfg.Monitor < len(a.monitors) {
-			ebiten.SetMonitor(a.monitors[a.cfg.Monitor].m)
+		if a.playMon < len(a.monitors) {
+			ebiten.SetMonitor(a.monitors[a.playMon].m)
 		}
 		ebiten.SetFullscreen(true)
 		ebiten.SetCursorMode(ebiten.CursorModeHidden)
@@ -139,27 +195,43 @@ func (a *App) setPlayMode() {
 }
 
 func (a *App) goMenu() {
+	a.stopChildren()
 	a.setWindowMode()
 	a.refreshMonitors()
 	a.scene = newMenuScene(a)
 }
 
-func (a *App) goPlay(p program.Program, timer time.Duration) {
-	log.Printf("開始播放：%s，播放時間 %v", p, timer)
+// goPlay 開始播放 Burn-In。base 是依序的節目表；設定洗牌時打散成涵蓋整個播放時間的節目表。
+func (a *App) goPlay(base program.Program, timer time.Duration) {
+	p := base
+	if a.cfg.Shuffle {
+		if a.opts.Seed == 0 && !a.opts.Child {
+			a.seed = rand.Uint64()
+		}
+		p = program.Shuffle(base, time.Duration(a.cfg.ShuffleSlice)*time.Second, a.seed, timer)
+		log.Printf("開始播放（洗牌，種子 %d）：%s，播放時間 %v", a.seed, base, timer)
+	} else {
+		log.Printf("開始播放：%s，播放時間 %v", p, timer)
+	}
 	a.setPlayMode()
 	a.scene = newPlayScene(p, timer, a.cfg.InfoBar)
+	a.startChildren(ModeBurnIn, base, timer)
 }
 
 func (a *App) goCheck(seq []CheckStep) {
 	log.Printf("開始檢查：共 %d 階", len(seq))
 	a.setPlayMode()
 	a.scene = newCheckScene(seq, a.cfg.InfoBar)
+	a.startChildren(ModeCheck, nil, 0)
 }
 
+// goSaver 切換成螢幕保護畫面；多螢幕播放中時，其他螢幕也一起切換。
 func (a *App) goSaver() {
 	log.Printf("螢幕保護：%s", a.cfg.Screensaver)
 	a.setPlayMode()
 	a.scene = newSaverScene(a.cfg.Screensaver)
+	a.broadcast("saver")
+	a.startChildren(ModeScreensaver, nil, 0)
 }
 
 // finishPlay 在播放時間到時執行後續動作。
@@ -170,6 +242,7 @@ func (a *App) finishPlay() error {
 		return ebiten.Termination
 	case actions.Shutdown, actions.Sleep:
 		a.scene = newCountdownScene(a.cfg.After, a.opts.Countdown)
+		a.broadcast("blank")
 	case actions.Screensaver:
 		a.goSaver()
 	}
@@ -183,6 +256,7 @@ func (a *App) leave() {
 
 // showMessage 顯示訊息，經過 d 時間或按任意鍵後執行 next。
 func (a *App) showMessage(msg string, d time.Duration, next func() error) {
+	a.stopChildren()
 	a.setWindowMode()
 	a.scene = &messageScene{msg: msg, until: time.Now().Add(d), next: next}
 }

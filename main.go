@@ -24,14 +24,15 @@ import (
 )
 
 // 這些參數代表「直接播放」：有任何一個時跳過警告畫面與設定選單。
-var playFlags = map[string]bool{"program": true, "timer": true, "after": true, "screensaver": true, "monitor": true, "check": true}
+var playFlags = map[string]bool{"program": true, "timer": true, "after": true, "screensaver": true, "monitor": true,
+	"check": true, "shuffle": true, "shuffle-slice": true, "child": true}
 
 func main() {
 	progFlag := flag.String("program", "", `節目表，例如 "gray-noise:600,vstripes:300"（秒數）`)
 	timerFlag := flag.Duration("timer", 0, "播放時間，例如 30m、1h（預設：-program 的一輪長度，或選單設定）")
 	afterFlag := flag.String("after", "", "時間到之後的動作：quit、shutdown、sleep、screensaver")
 	saverFlag := flag.String("screensaver", "", "螢幕保護畫面名稱")
-	monitorFlag := flag.Int("monitor", 1, "使用第幾個螢幕（從 1 開始）")
+	monitorFlag := flag.String("monitor", "1", `使用的螢幕（從 1 開始），多個螢幕用逗號分隔，例如 "1,2"；all 代表全部`)
 	listFlag := flag.Bool("list", false, "列出所有圖樣與螢幕保護畫面")
 	listMonitorsFlag := flag.Bool("list-monitors", false, "列出螢幕")
 	windowedFlag := flag.Bool("windowed", false, "以視窗模式播放（開發測試用）")
@@ -40,6 +41,11 @@ func main() {
 	snapshotFlag := flag.String("snapshot", "", "開發用：把各個畫面存成 PNG 到指定資料夾後結束")
 	checkFlag := flag.String("check", "", `直接開始檢查，例如 "gray-field:5,gray-steps:manual,white"（每階秒數或 manual；省略時用選單設定）`)
 	grayLevelsFlag := flag.Int("gray-levels", 0, "灰階分階的階數（2–256；預設用選單設定）")
+	shuffleFlag := flag.Bool("shuffle", false, "Burn-In 圖樣洗牌播放：每個圖樣切成小段打散，總時間不變")
+	sliceFlag := flag.Int("shuffle-slice", -1, "洗牌時每段的秒數；0 代表隨機 15–60 秒（預設用選單設定）")
+	seedFlag := flag.Uint64("seed", 0, "洗牌的亂數種子（預設每次隨機）")
+	childFlag := flag.String("child", "", "內部使用：多螢幕播放的子程式（burnin、check、screensaver）")
+	infoBarFlag := flag.Int("info-bar", -2, "內部使用：資訊列設定")
 	flag.CommandLine.SetOutput(os.Stderr)
 	flag.Usage = func() {
 		attachConsole()
@@ -69,6 +75,8 @@ func main() {
 		Windowed:   *windowedFlag,
 		DryRun:     *dryRunFlag,
 		Countdown:  *countdownFlag,
+		Seed:       *seedFlag,
+		Child:      *childFlag != "",
 	}
 
 	flag.Visit(func(f *flag.Flag) {
@@ -107,7 +115,19 @@ func main() {
 			cfg.Screensaver = *saverFlag
 		}
 		cfg.Mode = app.ModeBurnIn
-		cfg.Monitor = *monitorFlag - 1
+		if cfg.Monitors, err = parseMonitors(*monitorFlag); err != nil {
+			fatal(err.Error())
+		}
+		if *shuffleFlag {
+			cfg.Shuffle = true
+		}
+		if *sliceFlag >= 0 {
+			cfg.Shuffle = true
+			cfg.ShuffleSlice = *sliceFlag
+		}
+		if *infoBarFlag != -2 {
+			cfg.InfoBar = *infoBarFlag
+		}
 		if *checkFlag != "" {
 			if err := applyCheckFlag(&cfg, *checkFlag); err != nil {
 				fatal(err.Error())
@@ -116,6 +136,13 @@ func main() {
 		}
 		if *grayLevelsFlag != 0 {
 			cfg.GrayLevels = checks.ClampGrayLevels(*grayLevelsFlag)
+		}
+		switch *childFlag {
+		case "":
+		case string(app.ModeBurnIn), string(app.ModeCheck), string(app.ModeScreensaver):
+			cfg.Mode = app.Mode(*childFlag)
+		default:
+			fatal(fmt.Sprintf("-child 的值無效：%q", *childFlag))
 		}
 	}
 	opts.Config = cfg
@@ -134,7 +161,9 @@ func main() {
 	ebiten.SetWindowResizingMode(ebiten.WindowResizingModeEnabled)
 	ebiten.SetTPS(ebiten.SyncWithFPS) // 每次畫面更新都換一格雜訊，配合螢幕的更新率
 	a := app.New(opts)
-	if err := ebiten.RunGame(a); err != nil {
+	err = ebiten.RunGame(a)
+	a.Close()
+	if err != nil {
 		fatal(err.Error())
 	}
 	actions.KeepAwake(false)
@@ -143,6 +172,26 @@ func main() {
 			log.Printf("無法儲存設定: %v", err)
 		}
 	}
+}
+
+// parseMonitors 解析 -monitor 參數："1"、"1,2"、"all"（從 1 開始），回傳從 0 開始的編號。
+func parseMonitors(s string) ([]int, error) {
+	if strings.EqualFold(strings.TrimSpace(s), "all") {
+		var ms []int
+		for i := range ebiten.AppendMonitors(nil) {
+			ms = append(ms, i)
+		}
+		return ms, nil
+	}
+	var ms []int
+	for _, part := range strings.Split(s, ",") {
+		n, err := strconv.Atoi(strings.TrimSpace(part))
+		if err != nil || n < 1 {
+			return nil, fmt.Errorf("-monitor 的值無效：%q（例如 1、1,2 或 all）", s)
+		}
+		ms = append(ms, n-1)
+	}
+	return ms, nil
 }
 
 // applyCheckFlag 依 -check 參數設定要進行的檢查項目與秒數（依參數中的順序）。

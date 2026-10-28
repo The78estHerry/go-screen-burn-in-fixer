@@ -29,6 +29,7 @@ app/infobar.go             資訊列顯示邏輯（不顯示 / N 秒 / 一直顯
 app/menu.go                設定選單（三種模式；版面以 1000×720 邏輯座標描述）
 app/menu_widgets.go        選單小元件（selector、radio、checkbox、button）
 app/config.go              設定檔：exe 旁邊的 go-screen-burn-in-fixer.json
+app/multi.go               多螢幕：主程式啟動子程式、以標準輸入／輸出傳送指令（見第 12 節）
 app/snapshot.go            開發用：-snapshot 把各畫面存成 PNG（不操作桌面）
 internal/gfx/              Kage shader 共用函式（common.kage）、延遲編譯、繪製
 internal/ui/               字型（Noto Sans TC 子集）、顏色、繪圖輔助
@@ -39,6 +40,7 @@ screensaver/builtin.go     內建螢幕保護畫面；shader 在 screensaver/*.k
 checks/registry.go         檢查項目介面（Check、可選的 Statuser）+ Register()
 checks/builtin.go          內建檢查項目；shader 在 checks/*.kage
 program/program.go         節目表（圖樣:秒數序列、總長度、循環）
+program/shuffle.go         洗牌：每個圖樣切成小段打散，總時間不變
 actions/actions.go         後續動作：quit / shutdown / sleep / screensaver
 actions/power_windows.go   防睡眠（SetThreadExecutionState）、關機、睡眠
 actions/power_other.go     其他平台：回傳不支援
@@ -135,7 +137,8 @@ type Pattern interface {
 
 ## 6. 設定選單與參數
 
-- 點兩下 exe：警告畫面（「內含快速閃爍畫面，光敏性癲癇患者請勿觀看」，按任意鍵繼續）→ 設定選單（一般視窗）：模式（Burn-In 修復 / 只播螢幕保護）、螢幕、圖樣（可多選）與每段秒數、播放時間、時間到後的動作、螢幕保護畫面、結束螢幕保護後（回到選單 / 關閉程式）。滑鼠指到或焦點所在的圖樣會在右側預覽框即時播放。設定在開始播放與結束程式時存到 exe 旁邊的 `go-screen-burn-in-fixer.json`。
+- 「播放時間」：◀▶ 切換常用值（5 分鐘–24 小時），焦點在這一列時可直接輸入（`90` 分鐘、`3h`、`2:30`、`2h30m`，最長 72 小時，`MaxTimerMinutes`）。可直接輸入的列用 `item.edit`（`numEdit`）描述，灰階分階的階數也是。
+- 點兩下 exe：警告畫面（「內含快速閃爍畫面，光敏性癲癇患者請勿觀看」，按任意鍵繼續）→ 設定選單（一般視窗）：模式（Burn-In 修復 / 檢查畫面 / 只播螢幕保護）、螢幕（可多選）、圖樣（可多選）、依序 / 洗牌與每段秒數、播放時間、時間到後的動作、螢幕保護畫面、結束螢幕保護後（回到選單 / 關閉程式）。滑鼠指到或焦點所在的圖樣會在右側預覽框即時播放。設定在開始播放與結束程式時存到 exe 旁邊的 `go-screen-burn-in-fixer.json`。
 - 選單按鍵：↑↓（Tab）選擇、←→ 調整、空白鍵勾選 / 按下按鈕、Enter 開始播放、Esc 結束。
 - 帶參數時跳過警告與選單直接播放（給排程使用；參數不會寫回設定檔）：
 
@@ -145,7 +148,10 @@ type Pattern interface {
 | `-timer 30m` | 定時 |
 | `-after quit\|shutdown\|sleep\|screensaver` | 後續動作 |
 | `-screensaver drift-clock` | 螢幕保護畫面 |
-| `-monitor N` | 使用第 N 個螢幕 |
+| `-monitor 1,2` | 使用的螢幕（從 1 開始；多個用逗號分隔，`all` 代表全部） |
+| `-shuffle` / `-shuffle-slice N` | 洗牌播放；每段 N 秒，0 代表隨機 15–60 秒 |
+| `-seed N` | 洗牌的亂數種子（預設每次隨機） |
+| `-child <模式>`、`-info-bar` | 內部使用：多螢幕的子程式 |
 | `-list` / `-list-monitors` | 列出圖樣 / 螢幕（目前解析度與 EDID 原生解析度） |
 | `-windowed` | 視窗模式（開發測試用） |
 | `-dry-run` | 不真的關機 / 睡眠 |
@@ -175,7 +181,12 @@ type Pattern interface {
 go build -trimpath -ldflags "-s -w -H windowsgui" -o dist/go-screen-burn-in-fixer.exe .
 ```
 
-`CGO_ENABLED=0` 也可以建置。之後可以用 go-winres 加圖示與版本資訊（選用）。
+`CGO_ENABLED=0` 也可以建置。
+
+- 圖示、版本資訊、manifest：`winres/winres.json` + `winres/icon.png`、`icon16.png`（由 `go run ./tools/icon` 繪製），用 `go-winres make --arch amd64,arm64` 產生根目錄的 `rsrc_windows_*.syso`（納入版本控制，`go build` 自動連結）。go-winres 是建置工具，不在 `go.mod` 裡。
+- **發新版時**：同時更新 `winres/winres.json` 中所有版本號（`identity.version`、`file_version`、`product_version`、各語言的 `FileVersion`、`ProductVersion`），重新 `go-winres make`。
+- manifest 的 DPI 設定是 per monitor v2，與 Ebitengine 自己設定的相同。
+- SmartScreen「Windows 已保護您的電腦」是因為沒有程式碼簽章；使用者目前不打算購買簽章（README 有說明如何略過）。
 
 ---
 
@@ -185,8 +196,9 @@ go build -trimpath -ldflags "-s -w -H windowsgui" -o dist/go-screen-burn-in-fixe
 2. `-list`、`-list-monitors` 輸出正確。以 windowsgui 建置的 exe 在 PowerShell 中不會等它結束，測試時用 `Start-Process -Wait -RedirectStandardOutput <檔案>`。
 3. 版面：`go run . -snapshot <資料夾>` 產生 PNG 檢查。**不要用 SendKeys 之類的方式操作桌面**（按鍵可能送到使用者其他視窗）。
 4. 流程：`-windowed -program moving-bar:3 -timer 4s -after quit`（應自行結束）、`-after shutdown -dry-run -countdown 3s`（記錄應顯示「略過關機」）。自動測試優先用 `moving-bar`，避免在使用者面前突然出現快速閃爍的畫面。
-5. 全螢幕、多螢幕、實際按鍵操作、真的關機 / 睡眠：請使用者手動測試，或先取得同意。
-6. exe 複製到空資料夾單獨執行，不需要其他檔案。
+5. 多螢幕的流程可以在單一螢幕上測：`-windowed -monitor 1,1 ...` 會在同一個螢幕開兩個視窗（子程式也是視窗模式）。確認子程式跟著主程式結束（`Get-Process` 沒有殘留）、主程式被強制結束時子程式也會結束。
+6. 全螢幕、實際多螢幕、實際按鍵操作、真的關機 / 睡眠：請使用者手動測試，或先取得同意。
+7. exe 複製到空資料夾單獨執行，不需要其他檔案。
 
 ---
 
@@ -204,6 +216,25 @@ go build -trimpath -ldflags "-s -w -H windowsgui" -o dist/go-screen-burn-in-fixe
   - **按住 S**：資訊列顯示，放開即隱藏（使用者指定，主要給「不顯示」使用；其他設定下同樣有效）。
   - H：切換顯示／隱藏（任何設定下都有效）。
 
+## 12. 多螢幕與洗牌播放（已實作）
+
+### 多螢幕
+- 選單「螢幕」：只有一個螢幕時顯示它的說明；多個螢幕時每個螢幕一個勾選框（至少保留一個），←→ 選擇、空白鍵勾選。設定存在 `monitors`（從 0 開始、依編號排序）。舊設定檔的 `monitor`、`marks` 讀取時自動轉換。
+- Ebitengine 一個程式只能有一個視窗，所以**編號最小的螢幕由主程式播放，其他每個螢幕各啟動一個子程式**（同一個 exe 加 `-child <模式>`，播放內容全部用參數傳入）。不用「一個大視窗蓋住所有螢幕」：解析度、縮放、更新率不同時會出問題。
+- 主程式與子程式以標準輸入／輸出傳送文字指令（協定寫在 `app/multi.go` 開頭）。**計時、換階、後續動作都只由主程式決定**；子程式只顯示並回報按鍵，主程式執行後再把狀態送回所有子程式，另外每 2 秒同步一次播放位置。
+- 任何一個螢幕按 Esc：全部停止、回到選單。暫停、切換圖樣、檢查換階同步到所有螢幕（使用者選擇「同步」）。
+- 後續動作：關閉程式全部結束；關機／睡眠只在主程式倒數，子程式顯示全黑，任何螢幕按鍵都會取消；螢幕保護則每個螢幕都播。
+- 標記依螢幕分開存（`monitorMarks`，鍵是作業系統的裝置名稱 + 螢幕名稱）。子程式把標記送給主程式，由主程式存檔。
+- 主程式結束時子程式的標準輸入關閉，子程式也跟著結束（被強制結束也一樣）。
+
+### 洗牌
+- 選單「圖樣」旁的「依序／洗牌」與「每段」（15–60 秒隨機（預設）、10、20、30、60 秒）。洗牌時清單的秒數是**每個圖樣一輪的總時間**。
+- `program.Shuffle`：每個圖樣切成小段後打散，同一個圖樣不連續出現（跨輪也是）；每個圖樣一輪的總時間不變，每一輪重新洗牌。某個圖樣佔一輪一半以上時，它的每一段會變長，才能和其他圖樣交錯。
+- 結果由種子決定，多螢幕時子程式用同一個種子產生相同的節目表。資訊列顯示「本輪 已播放 / 總時間」。
+
+### 灰階階數的上限
+- Ebitengine 的輸出是 8 位元 SDR，每個顏色 256 階，所以 `gray-steps` 最多 256 階。10 位元（1024 階）或 HDR 的測試必須自己建立 10 位元／HDR10 的 DXGI swap chain，Ebitengine 做不到；使用者已知道，目前不做。
+
 ## 10. 開發進度
 
 - [x] 專案建立、文件
@@ -211,4 +242,8 @@ go build -trimpath -ldflags "-s -w -H windowsgui" -o dist/go-screen-burn-in-fixe
 - [x] 主程式（選單、定時、後續動作、螢幕偵測、EDID、字型）
 - [x] 上傳 Gitea
 - [x] 檢查模式（預覽已確認、選單、手動 / 自動、灰階分階、標記、資訊列設定）
-- [ ] 使用者手動測試：全螢幕、選單操作、螢幕保護、檢查模式、真的關機 / 睡眠
+- [x] v0.1.0 Release（附 exe）
+- [x] 多螢幕同時播放、洗牌播放（第 12 節）
+- [x] 播放時間可直接輸入（90、3h、2:30、2h30m，最長 72 小時）；exe 加上圖示與版本資訊（go-winres）
+- [x] EDID 原生解析度：也讀 CTA-861 與 DisplayID（Type I / VII）擴充區塊，取像素最多的詳細時序（超寬螢幕常把原生模式放在擴充區塊）
+- [ ] 使用者手動測試：全螢幕、選單操作、螢幕保護、檢查模式、多螢幕、真的關機 / 睡眠

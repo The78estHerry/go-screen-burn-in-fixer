@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"math"
+	"strconv"
 	"time"
 
 	"github.com/hajimehoshi/ebiten/v2"
@@ -100,31 +101,19 @@ func (s *playScene) position() (int, time.Duration) {
 
 func (s *playScene) Update(a *App) error {
 	s.info.update()
+	var err error
 	switch {
 	case inpututil.IsKeyJustPressed(ebiten.KeyEscape):
-		if a.opts.SkipMenu {
-			return ebiten.Termination
-		}
-		a.leave()
-		return nil
+		return s.command(a, "esc")
 	case inpututil.IsKeyJustPressed(ebiten.KeySpace):
-		if s.paused {
-			s.pausedTotal += time.Since(s.pausedAt)
-		} else {
-			s.pausedAt = time.Now()
-		}
-		s.paused = !s.paused
+		err = s.command(a, "pause")
 	case inpututil.IsKeyJustPressed(ebiten.KeyRight):
-		idx, off := s.position()
-		s.shift += s.prog[idx].Duration - off
+		err = s.command(a, "next")
 	case inpututil.IsKeyJustPressed(ebiten.KeyLeft):
-		idx, off := s.position()
-		if off < time.Second { // 段落剛開始時，跳到上一段；否則回到這一段的開頭
-			prev := (idx - 1 + len(s.prog)) % len(s.prog)
-			off += s.prog[prev].Duration
-		}
-		s.shift -= off
-		s.lastIdx = -1 // 回到同一段的開頭也顯示資訊列
+		err = s.command(a, "prev")
+	}
+	if err != nil || a.scene != s {
+		return err
 	}
 	if cx, cy := ebiten.CursorPosition(); cx != s.lastCursor[0] || cy != s.lastCursor[1] {
 		s.lastCursor = [2]int{cx, cy}
@@ -137,8 +126,77 @@ func (s *playScene) Update(a *App) error {
 	if !s.paused {
 		s.frame++
 	}
-	if s.elapsed() >= s.timer {
+	if a.up == nil && s.elapsed() >= s.timer { // 多螢幕時只由主程式計時
 		return a.finishPlay()
+	}
+	return nil
+}
+
+// command 執行按鍵指令。子程式把指令交給主程式；主程式執行後把播放位置送給所有子程式。
+func (s *playScene) command(a *App, cmd string) error {
+	if a.up != nil {
+		a.up.send(cmd)
+		return nil
+	}
+	switch cmd {
+	case "esc":
+		if a.opts.SkipMenu {
+			return ebiten.Termination
+		}
+		a.leave()
+		return nil
+	case "pause":
+		s.setPaused(!s.paused)
+	case "next":
+		idx, off := s.position()
+		s.shift += s.prog[idx].Duration - off
+	case "prev":
+		idx, off := s.position()
+		if off < time.Second { // 段落剛開始時，跳到上一段；否則回到這一段的開頭
+			prev := (idx - 1 + len(s.prog)) % len(s.prog)
+			off += s.prog[prev].Duration
+		}
+		s.shift -= off
+		s.lastIdx = -1 // 回到同一段的開頭也顯示資訊列
+	default:
+		return nil
+	}
+	s.sync(a)
+	return nil
+}
+
+func (s *playScene) setPaused(p bool) {
+	if p == s.paused {
+		return
+	}
+	if p {
+		s.pausedAt = time.Now()
+	} else {
+		s.pausedTotal += time.Since(s.pausedAt)
+	}
+	s.paused = p
+}
+
+// sync 把播放位置送給所有子程式。
+func (s *playScene) sync(a *App) {
+	paused := 0
+	if s.paused {
+		paused = 1
+	}
+	a.broadcast("pos %d %d", int64(s.elapsed()+s.shift), paused)
+}
+
+func (s *playScene) remote(a *App, cmd string, args []string) error {
+	if a.up == nil { // 主程式：子程式回報的按鍵
+		return s.command(a, cmd)
+	}
+	if cmd == "pos" && len(args) == 2 {
+		t, err := strconv.ParseInt(args[0], 10, 64)
+		if err != nil {
+			return nil
+		}
+		s.setPaused(args[1] == "1")
+		s.shift = time.Duration(t) - s.elapsed()
 	}
 	return nil
 }
@@ -152,8 +210,13 @@ func (s *playScene) Draw(a *App, screen *ebiten.Image) {
 	if s.paused {
 		state = "　［暫停］"
 	}
-	line1 := fmt.Sprintf("%s（%d/%d）　剩餘 %s　%.0f FPS%s",
-		s.prog[idx].Pattern, idx+1, len(s.prog), formatDuration(s.timer-s.elapsed()), ebiten.ActualFPS(), state)
+	seg := s.prog[idx]
+	where := fmt.Sprintf("（%d/%d）", idx+1, len(s.prog))
+	if seg.PatternTotal > 0 { // 洗牌：顯示這個圖樣在這一輪已播放的時間
+		where = fmt.Sprintf("　本輪 %s / %s", formatDuration(seg.Played+off), formatDuration(seg.PatternTotal))
+	}
+	line1 := fmt.Sprintf("%s%s　剩餘 %s　%.0f FPS%s",
+		seg.Pattern, where, formatDuration(s.timer-s.elapsed()), ebiten.ActualFPS(), state)
 	s.info.draw(screen, line1, "Esc 回到選單　空白鍵 暫停　← → 切換圖樣　H 資訊列　按住 S 顯示")
 }
 
@@ -220,6 +283,13 @@ func (s *countdownScene) Update(a *App) error {
 	return nil
 }
 
+func (s *countdownScene) remote(a *App, cmd string, _ []string) error {
+	if cmd == "esc" { // 在其他螢幕上按了鍵：取消
+		a.leave()
+	}
+	return nil
+}
+
 func (s *countdownScene) Draw(a *App, screen *ebiten.Image) {
 	screen.Fill(ui.ColorBackground)
 	sc, ox, oy := uiScale(screen)
@@ -242,6 +312,7 @@ type saverScene struct {
 	saver      screensaver.Saver
 	start      time.Time
 	lastCursor [2]int
+	sent       bool
 }
 
 func newSaverScene(name string) *saverScene {
@@ -260,10 +331,29 @@ func (s *saverScene) Update(a *App) error {
 	}
 	moved := math.Hypot(float64(cx-s.lastCursor[0]), float64(cy-s.lastCursor[1])) > 20
 	if anyInput() || moved {
-		if a.cfg.SaverExit == SaverExitQuit {
-			return ebiten.Termination
+		if a.up != nil { // 子程式：交給主程式結束所有螢幕
+			if !s.sent {
+				a.up.send("esc")
+				s.sent = true
+			}
+			return nil
 		}
-		a.leave()
+		return s.exit(a)
+	}
+	return nil
+}
+
+func (s *saverScene) exit(a *App) error {
+	if a.cfg.SaverExit == SaverExitQuit {
+		return ebiten.Termination
+	}
+	a.leave()
+	return nil
+}
+
+func (s *saverScene) remote(a *App, cmd string, _ []string) error {
+	if cmd == "esc" && a.up == nil {
+		return s.exit(a)
 	}
 	return nil
 }
