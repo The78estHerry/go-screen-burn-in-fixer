@@ -254,6 +254,10 @@ go run ./cmd/preview
 
 每個圖樣是 `patterns/` 下的一組 `.go` 與 `.kage`（Ebitengine 的 shader）檔案，在 `init()` 裡註冊，不需要修改其他程式碼。詳細步驟見 [CLAUDE.md](CLAUDE.md) 第 3.3 節。螢幕保護畫面（`screensaver/`）與檢查畫面（`checks/`）的做法相同。
 
+## 開發狀態
+
+目前進度、尚待實機確認的項目與已知限制見 [STATUS.md](STATUS.md)。
+
 ## 授權
 
 本專案採用 [MIT License](LICENSE)。
