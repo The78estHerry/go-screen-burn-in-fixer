@@ -46,12 +46,23 @@ func (g *snapshotGame) Update() error {
 	menu := newMenuScene(a)
 	menu.focus = 2 // 第一個圖樣列：預覽框顯示 gray-noise
 
-	play := newPlayScene(a.cfg.Program(), a.cfg.Timer())
-	play.hudOn = true
+	play := newPlayScene(a.cfg.Program(), a.cfg.Timer(), InfoAlways)
 	play.frame = 10
 
 	saverCfg := a.cfg
 	saverCfg.Mode = ModeScreensaver
+
+	// 檢查模式：第 3 個項目設成手動，示範「全部設為」變成自訂；加兩個標記與十字游標。
+	checkCfg := a.cfg
+	checkCfg.Mode = ModeCheck
+	checkCfg.CheckItems = append([]CheckItemConfig(nil), a.cfg.CheckItems...)
+	checkCfg.CheckItems[3].Seconds = Manual
+	checkCfg.Marks = []Mark{{X: 300, Y: 260}, {X: 720, Y: 480}}
+	checkMenu := newMenuScene(a)
+	checkMenu.focus = 3 // 第一個檢查項目
+	check := newCheckScene(checkCfg.CheckSequence()[3:4], InfoAlways)
+	check.lastCursor = [2]int{560, 400}
+	check.cursorUntil = time.Now().Add(time.Minute)
 
 	shots := []struct {
 		name  string
@@ -60,8 +71,10 @@ func (g *snapshotGame) Update() error {
 	}{
 		{"warning", warningScene{}, a.cfg},
 		{"menu", menu, a.cfg},
+		{"menu-check", checkMenu, checkCfg},
 		{"menu-screensaver", newMenuScene(a), saverCfg},
 		{"play-hud", play, a.cfg},
+		{"check-hud", check, checkCfg},
 		{"countdown", newCountdownScene(actions.Shutdown, 60*time.Second), a.cfg},
 		{"screensaver", newSaverScene("drift-clock"), a.cfg},
 	}

@@ -6,8 +6,9 @@ var StripeWidth float // 條紋寬度（像素）
 var Mode float
 
 func Fragment(dstPos vec4, srcPos vec2, color vec4) vec4 {
-	v := binColor(vec3(floor(dstPos.x/StripeWidth), 0.0, Frame))
-	h := binColor(vec3(floor(dstPos.y/StripeWidth), 13.0, Frame))
+	pos := pixelPos(dstPos)
+	v := binColor(vec3(floor(pos.x/StripeWidth), 0.0, Frame))
+	h := binColor(vec3(floor(pos.y/StripeWidth), 13.0, Frame))
 	c := v
 	if Mode > 1.5 {
 		c = abs(v - h)

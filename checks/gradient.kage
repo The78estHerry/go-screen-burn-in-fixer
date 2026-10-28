@@ -1,0 +1,27 @@
+// gradient：灰階、紅、綠、藍四條漸層，由暗到亮。
+// Vertical = 0：四條橫帶，由左到右變亮；Vertical = 1：四條直帶，由上到下變亮。
+
+var Resolution vec2
+var Vertical float
+
+func Fragment(dstPos vec4, srcPos vec2, color vec4) vec4 {
+	pos := pixelPos(dstPos)
+	along := pos.x / Resolution.x
+	across := pos.y / Resolution.y
+	if Vertical > 0.5 {
+		along = pos.y / Resolution.y
+		across = pos.x / Resolution.x
+	}
+	// 量化成 8 位元的 256 階，與一般畫面輸出一致。
+	v := floor(along*256.0) / 255.0
+	band := floor(across * 4.0)
+	c := vec3(v)
+	if band > 2.5 {
+		c = vec3(0.0, 0.0, v)
+	} else if band > 1.5 {
+		c = vec3(0.0, v, 0.0)
+	} else if band > 0.5 {
+		c = vec3(v, 0.0, 0.0)
+	}
+	return vec4(c, 1.0)
+}

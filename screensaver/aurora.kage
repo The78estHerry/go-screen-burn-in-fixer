@@ -5,7 +5,8 @@ var Time float
 var MaxBrightness float
 
 func Fragment(dstPos vec4, srcPos vec2, color vec4) vec4 {
-	uv := dstPos.xy / Resolution.y // 以高度為單位，維持長寬比
+	pos := pixelPos(dstPos)
+	uv := pos / Resolution.y // 以高度為單位，維持長寬比
 	t := Time
 	warp := fbm(uv*1.5+vec2(t*0.020, -t*0.015), 3.0)
 	n := fbm(vec2(uv.x*1.2+t*0.030, uv.y*2.5-t*0.020)+warp*1.5, 7.0)

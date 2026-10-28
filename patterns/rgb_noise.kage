@@ -4,5 +4,6 @@
 var Frame float
 
 func Fragment(dstPos vec4, srcPos vec2, color vec4) vec4 {
-	return vec4(binColor(vec3(floor(dstPos.xy), Frame)), 1.0)
+	pos := pixelPos(dstPos)
+	return vec4(binColor(vec3(floor(pos), Frame)), 1.0)
 }

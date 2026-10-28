@@ -1,5 +1,11 @@
 // 共用函式：由 gfx.NewShader 接在每個 shader 本體前面。
 
+// pixelPos 回傳目的影像內的像素座標。Ebitengine 可能把影像放在大貼圖（atlas）中，
+// dstPos 是以整張貼圖為準，必須減掉影像的原點；所有 shader 都要用這個函式，不要直接用 dstPos。
+func pixelPos(dstPos vec4) vec2 {
+	return dstPos.xy - imageDstOrigin()
+}
+
 // hash13 把 vec3 映射成 [0, 1) 的亂數（Dave Hoskins, "Hash without Sine"）。
 // 只用 fract 與 dot，在不同 GPU 上結果穩定。
 func hash13(p3 vec3) float {

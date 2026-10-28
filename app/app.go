@@ -60,9 +60,12 @@ type App struct {
 func New(opts Options) *App {
 	a := &App{opts: opts, cfg: opts.Config}
 	a.refreshMonitors()
-	if opts.SkipMenu {
+	switch {
+	case opts.SkipMenu && a.cfg.Mode == ModeCheck:
+		a.goCheck(a.cfg.CheckSequence())
+	case opts.SkipMenu:
 		a.goPlay(opts.Program, opts.Timer)
-	} else {
+	default:
 		a.scene = &warningScene{}
 	}
 	return a
@@ -144,7 +147,13 @@ func (a *App) goMenu() {
 func (a *App) goPlay(p program.Program, timer time.Duration) {
 	log.Printf("開始播放：%s，播放時間 %v", p, timer)
 	a.setPlayMode()
-	a.scene = newPlayScene(p, timer)
+	a.scene = newPlayScene(p, timer, a.cfg.InfoBar)
+}
+
+func (a *App) goCheck(seq []CheckStep) {
+	log.Printf("開始檢查：共 %d 階", len(seq))
+	a.setPlayMode()
+	a.scene = newCheckScene(seq, a.cfg.InfoBar)
 }
 
 func (a *App) goSaver() {

@@ -17,6 +17,7 @@ import (
 
 	"github.com/hajimehoshi/ebiten/v2"
 
+	"gitea.littleherry.work/The78estWorld/go-screen-burn-in-fixer/checks"
 	"gitea.littleherry.work/The78estWorld/go-screen-burn-in-fixer/patterns"
 	"gitea.littleherry.work/The78estWorld/go-screen-burn-in-fixer/screensaver"
 )
@@ -46,6 +47,7 @@ type job struct {
 	pixFmt  string  // 輸出的像素格式
 	seconds float64 // 影片長度；0 代表使用 -seconds 參數
 	render  func(dst *ebiten.Image, frame int, fps int)
+	still   func(out string) error // 設定時輸出 PNG 靜態圖（<name>.png），不產生影片
 }
 
 type game struct {
@@ -68,7 +70,15 @@ func (g *game) Update() error {
 	g.next++
 	out := filepath.Join(g.outDir, j.name+".mp4")
 	start := time.Now()
-	if err := g.encode(j, out); err != nil {
+	run := func() error { return g.encode(j, out) }
+	if j.still != nil {
+		out = filepath.Join(g.outDir, j.name+".png")
+		run = func() error { return j.still(out) }
+	}
+	if err := os.MkdirAll(filepath.Dir(out), 0o755); err != nil {
+		return err
+	}
+	if err := run(); err != nil {
 		log.Printf("✗ %s: %v", j.name, err)
 		g.failed = true
 		return nil
@@ -189,6 +199,19 @@ func buildJobs(only string) []job {
 			t := float64(frame) / float64(fps)
 			s.Draw(dst, screensaver.State{Time: t, Now: clockBase.Add(time.Duration(t * float64(time.Second)))})
 		}})
+	}
+	for _, c := range checks.All() {
+		if only != "" && only != c.Name() {
+			continue
+		}
+		jobs = append(jobs, job{name: "checks/" + c.Name(), still: func(out string) error { return writeCheckSheet(c, out) }})
+		if c.Name() == "retention-test" {
+			// 殘影測試會隨時間切換畫面，另外輸出實際速度的影片：格紋 10 秒 + 灰色 5 秒。
+			jobs = append(jobs, job{name: "checks/" + c.Name(), pixFmt: "yuv420p", seconds: checks.RetentionPatternSeconds + 5,
+				render: func(dst *ebiten.Image, frame, fps int) {
+					c.Draw(dst, 0, float64(frame)/float64(fps))
+				}})
+		}
 	}
 	return jobs
 }

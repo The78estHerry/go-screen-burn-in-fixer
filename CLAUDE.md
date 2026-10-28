@@ -23,8 +23,11 @@
 main.go                    參數解析、啟動 Ebitengine
 console_windows.go         -H windowsgui 建置時接上主控台輸出（-list 等）、錯誤訊息視窗
 app/app.go                 App（ebiten.Game）與場景切換：視窗 / 全螢幕、防睡眠
-app/scenes.go              警告、播放（含資訊列）、倒數、螢幕保護、訊息等場景
-app/menu.go                設定選單（滑鼠 + 鍵盤；版面以 1000×720 邏輯座標描述）
+app/scenes.go              警告、Burn-In 播放、倒數、螢幕保護、訊息等場景
+app/check.go               檢查進行中（依序顯示各階、手動 / 自動、標記、十字游標）
+app/infobar.go             資訊列顯示邏輯（不顯示 / N 秒 / 一直顯示、按住 S、H），Burn-In 與檢查共用
+app/menu.go                設定選單（三種模式；版面以 1000×720 邏輯座標描述）
+app/menu_widgets.go        選單小元件（selector、radio、checkbox、button）
 app/config.go              設定檔：exe 旁邊的 go-screen-burn-in-fixer.json
 app/snapshot.go            開發用：-snapshot 把各畫面存成 PNG（不操作桌面）
 internal/gfx/              Kage shader 共用函式（common.kage）、延遲編譯、繪製
@@ -33,6 +36,8 @@ patterns/registry.go       Burn-In 圖樣介面 + Register()
 patterns/builtin.go        內建圖樣註冊與預設參數；shader 在 patterns/*.kage
 screensaver/registry.go    螢幕保護畫面介面 + Register()
 screensaver/builtin.go     內建螢幕保護畫面；shader 在 screensaver/*.kage
+checks/registry.go         檢查項目介面（Check、可選的 Statuser）+ Register()
+checks/builtin.go          內建檢查項目；shader 在 checks/*.kage
 program/program.go         節目表（圖樣:秒數序列、總長度、循環）
 actions/actions.go         後續動作：quit / shutdown / sleep / screensaver
 actions/power_windows.go   防睡眠（SetThreadExecutionState）、關機、睡眠
@@ -185,10 +190,25 @@ go build -trimpath -ldflags "-s -w -H windowsgui" -o dist/go-screen-burn-in-fixe
 
 ---
 
+## 11. 檢查模式（已實作）
+
+- 選單「模式」三選一：Burn-In 修復／檢查畫面／只播螢幕保護。檢查畫面的選單版面與操作和 Burn-In 一致，「圖樣」換成「檢查項目」。
+- 檢查項目（`checks/`，介面 `checks.Check`，可擴充）：`gray-field`、`gray-steps`（階數 2–256 可自訂，預設 32；◀▶ 切換 8/16/32/64/128/256，選到該列時可直接輸入數字）、`color-field`、`retention-test`、`black`、`white`、`near-black`、`gradient`。有多「階」的項目，秒數指每一階。
+- 每個項目的秒數選項：手動、5、10、15、20、30、45、60、120 秒（手動在最左邊）。上方「全部設為」(•) 自動 10 秒 ( ) 手動：選了就套用到全部項目；項目各自不同時兩者都不選取（代表自訂）。預設全部自動 10 秒。
+- 檢查進行中：Enter／空白鍵 下一階（手動必須按；自動可提早跳過）、← 上一階、Esc 取消回到檢查選單、H 顯示／隱藏資訊列。全部完成後回到檢查選單。注意：Burn-In 播放時空白鍵是暫停，檢查時是下一個（使用者指定）。
+- **檢查畫面上不放任何文字**（會擋住檢查區域，也可能自己留下殘影）。狀態文字（例如殘影測試倒數）由可選介面 `checks.Statuser` 提供，只顯示在資訊列。
+- 標記：滑鼠移動時顯示十字游標與像素座標，點一下標記可疑位置（小圓圈），切換項目時保留；存檔到 exe 旁邊，下次開啟保留；選單可清除，檢查中按 C 清除。
+- 命令列：`-check "gray-field:5,gray-steps:manual,white"`（依參數順序；秒數或 manual，省略用選單設定）、`-gray-levels N`。帶 `-check` 時跳過選單，完成或 Esc 後結束程式。
+- shader 一律用 `pixelPos(dstPos)` 取得像素座標（見 `internal/gfx/common.kage`）；直接用 `dstPos` 在小影像（例如選單預覽框）上會因 atlas 位移而錯位。
+- **資訊列顯示設定（Burn-In 與檢查模式共用）**：不顯示／3／5／10 秒（切換階或項目、移動滑鼠時顯示 N 秒，預設 5 秒）／一直顯示。
+  - **按住 S**：資訊列顯示，放開即隱藏（使用者指定，主要給「不顯示」使用；其他設定下同樣有效）。
+  - H：切換顯示／隱藏（任何設定下都有效）。
+
 ## 10. 開發進度
 
 - [x] 專案建立、文件
 - [x] shader 與預覽影片（使用者已確認全部畫面）
 - [x] 主程式（選單、定時、後續動作、螢幕偵測、EDID、字型）
-- [ ] 使用者手動測試：全螢幕、選單操作、螢幕保護、真的關機 / 睡眠
-- [ ] 上傳 Gitea
+- [x] 上傳 Gitea
+- [x] 檢查模式（預覽已確認、選單、手動 / 自動、灰階分階、標記、資訊列設定）
+- [ ] 使用者手動測試：全螢幕、選單操作、螢幕保護、檢查模式、真的關機 / 睡眠

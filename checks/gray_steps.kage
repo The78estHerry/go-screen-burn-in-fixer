@@ -1,0 +1,11 @@
+// gray-steps：把畫面由左到右分成 Levels 條灰色色帶，由黑（0）到白（255）等距排列。
+
+var Resolution vec2
+var Levels float
+
+func Fragment(dstPos vec4, srcPos vec2, color vec4) vec4 {
+	pos := pixelPos(dstPos)
+	i := min(floor(pos.x/Resolution.x*Levels), Levels-1.0)
+	v := floor(i*255.0/(Levels-1.0)+0.5) / 255.0
+	return vec4(v, v, v, 1.0)
+}

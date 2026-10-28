@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"gitea.littleherry.work/The78estWorld/go-screen-burn-in-fixer/actions"
+	"gitea.littleherry.work/The78estWorld/go-screen-burn-in-fixer/checks"
 	"gitea.littleherry.work/The78estWorld/go-screen-burn-in-fixer/patterns"
 	"gitea.littleherry.work/The78estWorld/go-screen-burn-in-fixer/program"
 	"gitea.littleherry.work/The78estWorld/go-screen-burn-in-fixer/screensaver"
@@ -18,8 +19,31 @@ type Mode string
 
 const (
 	ModeBurnIn      Mode = "burnin"      // 播放 Burn-In 圖樣，時間到執行後續動作
+	ModeCheck       Mode = "check"       // 依序顯示檢查畫面
 	ModeScreensaver Mode = "screensaver" // 只播螢幕保護畫面
 )
+
+// Manual 是檢查項目秒數的特殊值：手動，按 Enter 或空白鍵才進行下一階。
+const Manual = 0
+
+// 資訊列顯示設定的特殊值；其他正數代表顯示的秒數。
+const (
+	InfoHidden = 0  // 不顯示（按住 S 或按 H 才出現）
+	InfoAlways = -1 // 一直顯示
+)
+
+// CheckItemConfig 是設定選單中的一個檢查項目。
+type CheckItemConfig struct {
+	Check   string `json:"check"`
+	Enabled bool   `json:"enabled"`
+	Seconds int    `json:"seconds"` // 每一階的秒數；Manual（0）代表手動
+}
+
+// Mark 是使用者在檢查畫面上標記的可疑位置（螢幕像素座標）。
+type Mark struct {
+	X int `json:"x"`
+	Y int `json:"y"`
+}
 
 // SaverExit 是螢幕保護畫面結束後的動作。
 type SaverExit string
@@ -45,15 +69,27 @@ type Config struct {
 	After        actions.After   `json:"after"`
 	Screensaver  string          `json:"screensaver"`
 	SaverExit    SaverExit       `json:"saverExit"`
+
+	CheckItems []CheckItemConfig `json:"checkItems"`
+	GrayLevels int               `json:"grayLevels"` // 灰階分階的階數
+	Marks      []Mark            `json:"marks"`
+
+	InfoBar int `json:"infoBar"` // 資訊列：InfoHidden、InfoAlways 或顯示秒數
 }
 
 // 選單中可選擇的數值。
 var (
 	segmentSecondsChoices = []int{10, 15, 20, 30, 45, 60, 90, 120, 180, 300, 600}
 	timerMinutesChoices   = []int{5, 10, 15, 20, 30, 45, 50, 60, 90, 120, 180, 240}
+	checkSecondsChoices   = []int{Manual, 5, 10, 15, 20, 30, 45, 60, 120}
+	infoBarChoices        = []int{InfoHidden, 3, 5, 10, InfoAlways}
 )
 
-// DefaultConfig 回傳預設設定：全部圖樣各 60 秒循環、播放 50 分鐘、結束後切換成螢幕保護。
+// DefaultCheckSeconds 是檢查項目「自動」時的預設秒數。
+const DefaultCheckSeconds = 10
+
+// DefaultConfig 回傳預設設定：全部圖樣各 60 秒循環、播放 50 分鐘、結束後切換成螢幕保護；
+// 檢查項目全部自動 10 秒；資訊列顯示 5 秒。
 func DefaultConfig() Config {
 	c := Config{
 		Mode:         ModeBurnIn,
@@ -61,9 +97,14 @@ func DefaultConfig() Config {
 		After:        actions.Screensaver,
 		Screensaver:  screensaver.All()[0].Name(),
 		SaverExit:    SaverExitMenu,
+		GrayLevels:   checks.DefaultGrayLevels,
+		InfoBar:      5,
 	}
 	for _, p := range patterns.All() {
 		c.Segments = append(c.Segments, SegmentConfig{Pattern: p.Name(), Enabled: true, Seconds: int(program.DefaultSegment.Seconds())})
+	}
+	for _, ck := range checks.All() {
+		c.CheckItems = append(c.CheckItems, CheckItemConfig{Check: ck.Name(), Enabled: true, Seconds: DefaultCheckSeconds})
 	}
 	return c
 }
@@ -107,8 +148,26 @@ func (c Config) Save(path string) error {
 // normalize 修正無效的值，並補上新版本新增、舊設定檔沒有的圖樣。
 func (c *Config) normalize() {
 	def := DefaultConfig()
-	if c.Mode != ModeBurnIn && c.Mode != ModeScreensaver {
+	if c.Mode != ModeBurnIn && c.Mode != ModeCheck && c.Mode != ModeScreensaver {
 		c.Mode = def.Mode
+	}
+	c.GrayLevels = checks.ClampGrayLevels(c.GrayLevels)
+	if !contains(infoBarChoices, c.InfoBar) {
+		c.InfoBar = def.InfoBar
+	}
+
+	oldChecks := map[string]CheckItemConfig{}
+	for _, it := range c.CheckItems {
+		oldChecks[it.Check] = it
+	}
+	c.CheckItems = c.CheckItems[:0]
+	for _, d := range def.CheckItems {
+		it, ok := oldChecks[d.Check]
+		if !ok {
+			it = d
+		}
+		it.Seconds = nearest(checkSecondsChoices, it.Seconds)
+		c.CheckItems = append(c.CheckItems, it)
 	}
 	if _, err := actions.ParseAfter(string(c.After)); err != nil {
 		c.After = def.After
@@ -154,6 +213,47 @@ func (c Config) Program() program.Program {
 // Timer 回傳播放時間。
 func (c Config) Timer() time.Duration {
 	return time.Duration(c.TimerMinutes) * time.Minute
+}
+
+// CheckStep 是檢查流程中的一階。
+type CheckStep struct {
+	Check   checks.Check
+	Step    int
+	Seconds int // Manual 代表手動
+	Index   int // 第幾個項目（從 0 開始）
+	Items   int // 項目總數
+}
+
+// CheckSequence 依勾選的項目展開成依序顯示的每一階，並套用灰階分階的階數。
+func (c Config) CheckSequence() []CheckStep {
+	if g, ok := checks.Get("gray-steps"); ok {
+		if gs, ok := g.(*checks.GraySteps); ok {
+			gs.Levels = c.GrayLevels
+		}
+	}
+	var items []CheckItemConfig
+	for _, it := range c.CheckItems {
+		if _, ok := checks.Get(it.Check); ok && it.Enabled {
+			items = append(items, it)
+		}
+	}
+	var seq []CheckStep
+	for i, it := range items {
+		ck, _ := checks.Get(it.Check)
+		for s := range ck.Steps() {
+			seq = append(seq, CheckStep{Check: ck, Step: s, Seconds: it.Seconds, Index: i, Items: len(items)})
+		}
+	}
+	return seq
+}
+
+func contains(choices []int, v int) bool {
+	for _, c := range choices {
+		if c == v {
+			return true
+		}
+	}
+	return false
 }
 
 // nearest 回傳 choices 中最接近 v 的值。

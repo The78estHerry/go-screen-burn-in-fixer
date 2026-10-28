@@ -5,7 +5,8 @@ var Contrast float  // 0–1，1 代表全黑到全白
 var PixelSize float // 雜訊顆粒大小（像素）
 
 func Fragment(dstPos vec4, srcPos vec2, color vec4) vec4 {
-	p := floor(dstPos.xy / PixelSize)
+	pos := pixelPos(dstPos)
+	p := floor(pos / PixelSize)
 	v := hash13(vec3(p, Frame))
 	g := 0.5 + (v-0.5)*Contrast
 	return vec4(g, g, g, 1.0)

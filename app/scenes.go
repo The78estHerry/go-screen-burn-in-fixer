@@ -59,8 +59,6 @@ func (warningScene) Draw(a *App, screen *ebiten.Image) {
 
 // ── 播放 Burn-In ─────────────────────────────────────────
 
-const hudShowDuration = 3 * time.Second
-
 type playScene struct {
 	prog  program.Program
 	timer time.Duration
@@ -72,14 +70,14 @@ type playScene struct {
 	shift       time.Duration // ←/→ 切換圖樣造成的節目時間位移
 	frame       int
 
-	hudOn      bool
-	hudUntil   time.Time
+	info       *infoBar
+	lastIdx    int
 	lastCursor [2]int
 }
 
-func newPlayScene(p program.Program, timer time.Duration) *playScene {
+func newPlayScene(p program.Program, timer time.Duration, infoSetting int) *playScene {
 	cx, cy := ebiten.CursorPosition()
-	return &playScene{prog: p, timer: timer, start: time.Now(), lastCursor: [2]int{cx, cy}}
+	return &playScene{prog: p, timer: timer, start: time.Now(), info: newInfoBar(infoSetting), lastCursor: [2]int{cx, cy}}
 }
 
 // elapsed 回傳實際播放的時間（不含暫停）。
@@ -101,6 +99,7 @@ func (s *playScene) position() (int, time.Duration) {
 }
 
 func (s *playScene) Update(a *App) error {
+	s.info.update()
 	switch {
 	case inpututil.IsKeyJustPressed(ebiten.KeyEscape):
 		if a.opts.SkipMenu {
@@ -118,7 +117,6 @@ func (s *playScene) Update(a *App) error {
 	case inpututil.IsKeyJustPressed(ebiten.KeyRight):
 		idx, off := s.position()
 		s.shift += s.prog[idx].Duration - off
-		s.flashHUD()
 	case inpututil.IsKeyJustPressed(ebiten.KeyLeft):
 		idx, off := s.position()
 		if off < time.Second { // 段落剛開始時，跳到上一段；否則回到這一段的開頭
@@ -126,13 +124,15 @@ func (s *playScene) Update(a *App) error {
 			off += s.prog[prev].Duration
 		}
 		s.shift -= off
-		s.flashHUD()
-	case inpututil.IsKeyJustPressed(ebiten.KeyH):
-		s.hudOn = !s.hudOn
+		s.lastIdx = -1 // 回到同一段的開頭也顯示資訊列
 	}
 	if cx, cy := ebiten.CursorPosition(); cx != s.lastCursor[0] || cy != s.lastCursor[1] {
 		s.lastCursor = [2]int{cx, cy}
-		s.flashHUD()
+		s.info.flash()
+	}
+	if idx, _ := s.position(); idx != s.lastIdx { // 換圖樣時顯示資訊列
+		s.lastIdx = idx
+		s.info.flash()
 	}
 	if !s.paused {
 		s.frame++
@@ -143,36 +143,18 @@ func (s *playScene) Update(a *App) error {
 	return nil
 }
 
-func (s *playScene) flashHUD() { s.hudUntil = time.Now().Add(hudShowDuration) }
-
 func (s *playScene) Draw(a *App, screen *ebiten.Image) {
 	idx, off := s.position()
 	if p, ok := patterns.Get(s.prog[idx].Pattern); ok {
 		p.Draw(screen, patterns.State{Frame: s.frame, Time: off.Seconds()})
 	}
-	if s.hudOn || time.Now().Before(s.hudUntil) || s.paused {
-		state := ""
-		if s.paused {
-			state = "　［暫停］"
-		}
-		line1 := fmt.Sprintf("%s（%d/%d）　剩餘 %s　%.0f FPS%s",
-			s.prog[idx].Pattern, idx+1, len(s.prog), formatDuration(s.timer-s.elapsed()), ebiten.ActualFPS(), state)
-		drawHUD(screen, line1, "Esc 回到選單　空白鍵 暫停　← → 切換圖樣　H 資訊列")
+	state := ""
+	if s.paused {
+		state = "　［暫停］"
 	}
-}
-
-// drawHUD 在畫面左上角繪製兩行資訊。
-func drawHUD(screen *ebiten.Image, line1, line2 string) {
-	s := float64(screen.Bounds().Dy()) / 1080 // 以 1080p 為基準縮放
-	if s < 0.6 {
-		s = 0.6
-	}
-	size := 22 * s
-	w1, _ := ui.Measure(line1, size)
-	w2, _ := ui.Measure(line2, size*0.8)
-	ui.Fill(screen, ui.Rect{X: 16 * s, Y: 16 * s, W: math.Max(w1, w2) + 32*s, H: 84 * s}, ui.ColorHUD)
-	ui.Text(screen, line1, 32*s, 26*s, size, ui.ColorText, ui.Left)
-	ui.Text(screen, line2, 32*s, 60*s, size*0.8, ui.ColorDim, ui.Left)
+	line1 := fmt.Sprintf("%s（%d/%d）　剩餘 %s　%.0f FPS%s",
+		s.prog[idx].Pattern, idx+1, len(s.prog), formatDuration(s.timer-s.elapsed()), ebiten.ActualFPS(), state)
+	s.info.draw(screen, line1, "Esc 回到選單　空白鍵 暫停　← → 切換圖樣　H 資訊列　按住 S 顯示")
 }
 
 // formatDuration 把時間格式化成 h:mm:ss 或 m:ss。

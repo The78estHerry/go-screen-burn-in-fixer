@@ -24,6 +24,23 @@
 | [solid-cycle.mp4](solid-cycle.mp4) | `solid-cycle` | 全螢幕紅 → 綠 → 藍 → 白 → 黑，每種顏色 0.5 秒 |
 | [moving-bar.mp4](moving-bar.mp4) | `moving-bar` | 黑底白色色條，每 1.5 秒掃過一趟，水平、垂直輪流 |
 
+## 檢查畫面
+
+檢查畫面大多是靜止的，所以預覽用 PNG：每一階排成一格（640x480），格子下方的文字只是預覽圖的標示，**實際檢查畫面上沒有任何文字**；需要的資訊（目前項目、倒數秒數、要看什麼）按 H 或移動滑鼠時才會出現在可隱藏的資訊列。
+
+| 預覽 | 名稱 | 檢查什麼 |
+|---|---|---|
+| [checks/gray-field.png](checks/gray-field.png) | `gray-field` | 灰階 5、10、18、25、35、50、75%：烙印的影子（18–35% 最明顯） |
+| [checks/gray-steps.png](checks/gray-steps.png) | `gray-steps` | 灰階分階，階數可自訂（2–256；預覽為 16、32、64、256 階）：螢幕能分辨的灰階數、暗部細節 |
+| [checks/color-field.png](checks/color-field.png) | `color-field` | 紅、綠、藍各 25、50、100%：子像素老化不平均、判斷哪個子像素壞了 |
+| [checks/retention-test.png](checks/retention-test.png)（[影片](checks/retention-test.mp4)） | `retention-test` | 黑白格紋 10 秒後切換成灰色：暫時性殘影多久消失 |
+| [checks/black.png](checks/black.png) | `black` | 全黑：亮點、卡住的像素 |
+| [checks/white.png](checks/white.png) | `white` | 全白：暗點、死像素、灰塵 |
+| [checks/near-black.png](checks/near-black.png) | `near-black` | 近黑 1、2、3、5%：暗部不均勻（雲斑、mura）、角落偏亮 |
+| [checks/gradient.png](checks/gradient.png) | `gradient` | 灰階與紅綠藍漸層（水平／垂直）：不規則的斷層或色偏 |
+
+百分比是 8 位元訊號值的比例（例如 25% = 64/255），不是亮度。
+
 ## 螢幕保護畫面
 
 亮度上限 30%，不閃爍，持續移動，不會長時間停在同一個位置。

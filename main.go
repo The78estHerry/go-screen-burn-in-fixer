@@ -8,12 +8,15 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/hajimehoshi/ebiten/v2"
 
 	"gitea.littleherry.work/The78estWorld/go-screen-burn-in-fixer/actions"
 	"gitea.littleherry.work/The78estWorld/go-screen-burn-in-fixer/app"
+	"gitea.littleherry.work/The78estWorld/go-screen-burn-in-fixer/checks"
 	"gitea.littleherry.work/The78estWorld/go-screen-burn-in-fixer/display"
 	"gitea.littleherry.work/The78estWorld/go-screen-burn-in-fixer/patterns"
 	"gitea.littleherry.work/The78estWorld/go-screen-burn-in-fixer/program"
@@ -21,7 +24,7 @@ import (
 )
 
 // 這些參數代表「直接播放」：有任何一個時跳過警告畫面與設定選單。
-var playFlags = map[string]bool{"program": true, "timer": true, "after": true, "screensaver": true, "monitor": true}
+var playFlags = map[string]bool{"program": true, "timer": true, "after": true, "screensaver": true, "monitor": true, "check": true}
 
 func main() {
 	progFlag := flag.String("program", "", `節目表，例如 "gray-noise:600,vstripes:300"（秒數）`)
@@ -35,6 +38,8 @@ func main() {
 	dryRunFlag := flag.Bool("dry-run", false, "測試用：時間到時不真的關機或睡眠")
 	countdownFlag := flag.Duration("countdown", 60*time.Second, "關機 / 睡眠前的倒數時間")
 	snapshotFlag := flag.String("snapshot", "", "開發用：把各個畫面存成 PNG 到指定資料夾後結束")
+	checkFlag := flag.String("check", "", `直接開始檢查，例如 "gray-field:5,gray-steps:manual,white"（每階秒數或 manual；省略時用選單設定）`)
+	grayLevelsFlag := flag.Int("gray-levels", 0, "灰階分階的階數（2–256；預設用選單設定）")
 	flag.CommandLine.SetOutput(os.Stderr)
 	flag.Usage = func() {
 		attachConsole()
@@ -103,6 +108,15 @@ func main() {
 		}
 		cfg.Mode = app.ModeBurnIn
 		cfg.Monitor = *monitorFlag - 1
+		if *checkFlag != "" {
+			if err := applyCheckFlag(&cfg, *checkFlag); err != nil {
+				fatal(err.Error())
+			}
+			cfg.Mode = app.ModeCheck
+		}
+		if *grayLevelsFlag != 0 {
+			cfg.GrayLevels = checks.ClampGrayLevels(*grayLevelsFlag)
+		}
 	}
 	opts.Config = cfg
 
@@ -131,6 +145,44 @@ func main() {
 	}
 }
 
+// applyCheckFlag 依 -check 參數設定要進行的檢查項目與秒數（依參數中的順序）。
+func applyCheckFlag(cfg *app.Config, s string) error {
+	byName := map[string]app.CheckItemConfig{}
+	for _, it := range cfg.CheckItems {
+		byName[it.Check] = it
+	}
+	var items []app.CheckItemConfig
+	for _, part := range strings.Split(s, ",") {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+		name, secs, hasSecs := strings.Cut(part, ":")
+		it, ok := byName[name]
+		if !ok {
+			return fmt.Errorf("沒有名為 %q 的檢查項目", name)
+		}
+		it.Enabled = true
+		switch {
+		case !hasSecs:
+		case secs == "manual":
+			it.Seconds = app.Manual
+		default:
+			n, err := strconv.Atoi(secs)
+			if err != nil || n <= 0 {
+				return fmt.Errorf("檢查項目 %s 的秒數無效：%q（可用正整數或 manual）", name, secs)
+			}
+			it.Seconds = n
+		}
+		items = append(items, it)
+	}
+	if len(items) == 0 {
+		return fmt.Errorf("-check 沒有指定任何檢查項目")
+	}
+	cfg.CheckItems = items
+	return nil
+}
+
 func printList() {
 	fmt.Println("Burn-In 圖樣：")
 	for _, p := range patterns.All() {
@@ -139,6 +191,10 @@ func printList() {
 	fmt.Println("螢幕保護畫面：")
 	for _, s := range screensaver.All() {
 		fmt.Printf("  %-15s %s\n", s.Name(), s.Description())
+	}
+	fmt.Println("檢查項目：")
+	for _, c := range checks.All() {
+		fmt.Printf("  %-15s %s（%d 階）\n", c.Name(), c.Description(), len(c.Steps()))
 	}
 }
 
