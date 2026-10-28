@@ -1,0 +1,8 @@
+// rgb-noise：每個像素的紅、綠、藍子像素各自隨機全開或全關，每格都不同。
+// 比 gray-noise 更細：灰階雜訊同一像素的三個子像素亮度相同，這裡三個子像素各自獨立。
+
+var Frame float
+
+func Fragment(dstPos vec4, srcPos vec2, color vec4) vec4 {
+	return vec4(binColor(vec3(floor(dstPos.xy), Frame)), 1.0)
+}

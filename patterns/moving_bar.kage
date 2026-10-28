@@ -1,0 +1,21 @@
+// moving-bar：黑底白色色條。偶數趟由左往右掃（直色條），奇數趟由上往下掃（橫色條）。
+
+var Resolution vec2
+var Time float
+var Period float  // 掃過一趟的秒數
+var BarFrac float // 色條粗細佔螢幕寬（或高）的比例
+
+func Fragment(dstPos vec4, srcPos vec2, color vec4) vec4 {
+	pass := floor(Time / Period)
+	ph := fract(Time / Period)
+	pos := dstPos.x
+	size := Resolution.x
+	if mod(pass, 2.0) > 0.5 {
+		pos = dstPos.y
+		size = Resolution.y
+	}
+	w := BarFrac * size
+	start := -w + ph*(size+w)
+	on := step(start, pos) * step(pos, start+w)
+	return vec4(on, on, on, 1.0)
+}

@@ -1,0 +1,18 @@
+// vstripes / hstripes / cross：隨機顏色條紋，每格重新排列。
+// Mode：0 = 直條紋，1 = 橫條紋，2 = 十字格紋（直 XOR 橫）。
+
+var Frame float
+var StripeWidth float // 條紋寬度（像素）
+var Mode float
+
+func Fragment(dstPos vec4, srcPos vec2, color vec4) vec4 {
+	v := binColor(vec3(floor(dstPos.x/StripeWidth), 0.0, Frame))
+	h := binColor(vec3(floor(dstPos.y/StripeWidth), 13.0, Frame))
+	c := v
+	if Mode > 1.5 {
+		c = abs(v - h)
+	} else if Mode > 0.5 {
+		c = h
+	}
+	return vec4(c, 1.0)
+}
