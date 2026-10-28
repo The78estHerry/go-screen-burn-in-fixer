@@ -107,6 +107,6 @@ go run ./cmd/preview
 
 ## 授權
 
-TODO：尚未決定本專案的授權條款。
+本專案採用 [MIT License](LICENSE)。
 
 內嵌字型 Noto Sans TC（子集）採用 [SIL Open Font License 1.1](internal/ui/NotoSansTC-LICENSE.txt)。
