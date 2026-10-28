@@ -65,6 +65,12 @@ type App struct {
 	seed    uint64  // 這次播放的洗牌種子，傳給子程式
 	hub     *hub    // 主程式：多螢幕播放中的子程式
 	up      *upLink // 子程式：與主程式的連線
+
+	// 開始播放前設定選單視窗所在的螢幕與位置；播放結束回到選單時放回原處。
+	menuMon   *ebiten.MonitorType
+	menuX     int
+	menuY     int
+	menuSaved bool
 }
 
 // New 建立程式主體。
@@ -174,9 +180,16 @@ func monitorKey(i int, device string) string {
 	return fmt.Sprintf("monitor-%d", i+1)
 }
 
-// setWindowMode 切換成一般視窗（警告畫面、設定選單）。
+// setWindowMode 切換成一般視窗（警告畫面、設定選單），放回開始播放前的螢幕與位置。
 func (a *App) setWindowMode() {
 	ebiten.SetFullscreen(false)
+	if a.menuSaved {
+		if a.menuMon != nil {
+			ebiten.SetMonitor(a.menuMon)
+		}
+		ebiten.SetWindowPosition(a.menuX, a.menuY)
+		a.menuSaved = false
+	}
 	ebiten.SetCursorMode(ebiten.CursorModeVisible)
 	actions.KeepAwake(false)
 }
@@ -185,6 +198,11 @@ func (a *App) setWindowMode() {
 func (a *App) setPlayMode() {
 	a.playMon = a.cfg.Monitors[0]
 	if !a.opts.Windowed {
+		if !a.menuSaved && !ebiten.IsFullscreen() { // 記住選單視窗的位置（已在播放中切換場景時不覆蓋）
+			a.menuMon = ebiten.Monitor()
+			a.menuX, a.menuY = ebiten.WindowPosition()
+			a.menuSaved = true
+		}
 		if a.playMon < len(a.monitors) {
 			ebiten.SetMonitor(a.monitors[a.playMon].m)
 		}

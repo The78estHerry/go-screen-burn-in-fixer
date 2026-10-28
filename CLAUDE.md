@@ -183,6 +183,11 @@ go build -trimpath -ldflags "-s -w -H windowsgui" -o dist/go-screen-burn-in-fixe
 
 `CGO_ENABLED=0` 也可以建置。
 
+- **全部平台**：`python tools/release/build.py` → `dist/release/`：Windows exe、macOS `.app`（arm64 / amd64 各一個 zip，zip 內設定 Unix 執行權限）、Linux amd64 tar.gz。全部 `CGO_ENABLED=0` 交叉編譯：Ebitengine 2.10 在 macOS 用 purego、在 Linux 用純 Go 的 X11 GLFW（執行時 dlopen libX11 / libGL），都不需要 cgo。darwin/arm64 由 Go 連結器自動加 ad-hoc 簽章（沒有簽章無法執行）。
+- **macOS**：沒有 Apple 開發者簽章與公證，使用者第一次開啟要「強制打開」或 `xattr -cr`（README 有說明）。`.app` 裡執行時設定檔改存 `~/Library/Application Support/go-screen-burn-in-fixer/`（`app.ConfigPath`）。
+- **電源（`actions/power_*.go`）**：macOS 用 `caffeinate -d -i -w <pid>` 防睡眠、`osascript` 關機、`pmset sleepnow` 睡眠；Linux 用 `systemd-inhibit --what=idle:sleep` + 每 30 秒 `xdg-screensaver reset` 防止螢幕關閉、`systemctl poweroff` / `suspend`。
+- **macOS、Linux 尚未實機測試**；`display`（螢幕名稱、EDID）目前只有 Windows 實作，其他平台回傳不支援，選單只顯示編號與解析度。
+
 - 圖示、版本資訊、manifest：`winres/winres.json` + `winres/icon.png`、`icon16.png`（由 `go run ./tools/icon` 繪製），用 `go-winres make --arch amd64,arm64` 產生根目錄的 `rsrc_windows_*.syso`（納入版本控制，`go build` 自動連結）。go-winres 是建置工具，不在 `go.mod` 裡。
 - **發新版時**：同時更新 `winres/winres.json` 中所有版本號（`identity.version`、`file_version`、`product_version`、各語言的 `FileVersion`、`ProductVersion`），重新 `go-winres make`。
 - manifest 的 DPI 設定是 per monitor v2，與 Ebitengine 自己設定的相同。
@@ -245,5 +250,7 @@ go build -trimpath -ldflags "-s -w -H windowsgui" -o dist/go-screen-burn-in-fixe
 - [x] v0.1.0 Release（附 exe）
 - [x] 多螢幕同時播放、洗牌播放（第 12 節）
 - [x] 播放時間可直接輸入（90、3h、2:30、2h30m，最長 72 小時）；exe 加上圖示與版本資訊（go-winres）
+- [x] macOS（Apple Silicon / Intel）與 Linux x64 版本（`tools/release/build.py`）；播放結束後設定選單回到原本的螢幕與位置
+- [ ] macOS、Linux 實機測試
 - [x] EDID 原生解析度：也讀 CTA-861 與 DisplayID（Type I / VII）擴充區塊，取像素最多的詳細時序（超寬螢幕常把原生模式放在擴充區塊）
 - [ ] 使用者手動測試：全螢幕、選單操作、螢幕保護、檢查模式、多螢幕、真的關機 / 睡眠

@@ -122,13 +122,23 @@ func DefaultConfig() Config {
 	return c
 }
 
-// ConfigPath 回傳設定檔路徑（exe 旁邊）。
+// ConfigPath 回傳設定檔路徑：exe 旁邊。macOS 的 .app 裡不應寫入檔案（放在「應用程式」資料夾時也沒有權限），
+// 所以在 .app 裡執行時改用 ~/Library/Application Support/go-screen-burn-in-fixer/。
 func ConfigPath() string {
+	const name = "go-screen-burn-in-fixer.json"
 	exe, err := os.Executable()
 	if err != nil {
-		return "go-screen-burn-in-fixer.json"
+		return name
 	}
-	return filepath.Join(filepath.Dir(exe), "go-screen-burn-in-fixer.json")
+	if strings.Contains(filepath.ToSlash(exe), ".app/Contents/MacOS/") {
+		if dir, err := os.UserConfigDir(); err == nil {
+			dir = filepath.Join(dir, "go-screen-burn-in-fixer")
+			if err := os.MkdirAll(dir, 0o755); err == nil {
+				return filepath.Join(dir, name)
+			}
+		}
+	}
+	return filepath.Join(filepath.Dir(exe), name)
 }
 
 // LoadConfig 讀取設定檔；檔案不存在或格式錯誤時回傳預設設定。

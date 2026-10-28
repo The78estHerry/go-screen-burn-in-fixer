@@ -4,7 +4,7 @@
 
 另外內建**檢查畫面**：灰階、單色、近黑、漸層、全黑全白與殘影測試，用來找出烙印、暫時性殘影、壞點與不均勻。
 
-- **單一 exe**：不需要安裝任何東西，點兩下就能執行。
+- **單一執行檔**：不需要安裝任何東西，點兩下就能執行。支援 Windows、macOS（Apple Silicon / Intel）、Ubuntu 等 Linux x64。
 - **即時產生畫面**：由顯示卡即時運算，任何解析度、更新率都清楚，不需要下載或轉檔影片。
 - **自動配合螢幕**：預設使用目前螢幕的解析度，也能讀取 EDID 顯示原生解析度。
 - **多螢幕**：可以選擇一個、幾個或全部螢幕同時播放或檢查。
@@ -70,6 +70,37 @@
 | `aurora` | 流動的深色漸層色帶 |
 
 ## 使用方式
+
+### 下載
+
+到 [Releases](https://gitea.littleherry.work/The78estWorld/go-screen-burn-in-fixer/releases) 下載對應的檔案：
+
+| 系統 | 檔案 |
+|---|---|
+| Windows x64 | `go-screen-burn-in-fixer-<版本>-windows-amd64.exe` |
+| macOS（M1 以後的 Apple Silicon） | `go-screen-burn-in-fixer-<版本>-macos-apple-silicon.zip` |
+| macOS（Intel） | `go-screen-burn-in-fixer-<版本>-macos-intel.zip` |
+| Ubuntu 等 Linux x64 | `go-screen-burn-in-fixer-<版本>-linux-amd64.tar.gz` |
+
+**Windows**：第一次執行若出現「Windows 已保護您的電腦」，點「其他資訊」→「仍要執行」（沒有程式碼簽章的關係）。
+
+**macOS**（需要 macOS 12 以上）：解壓縮後把 `go-screen-burn-in-fixer.app` 拖到「應用程式」。程式沒有 Apple 的開發者簽章，第一次開啟會被擋下（「無法打開」或「已損毀」），擇一處理：
+- 「系統設定」→「隱私權與安全性」，在下方按「強制打開」。
+- 或在「終端機」執行：`xattr -cr /Applications/go-screen-burn-in-fixer.app`
+
+設定檔存在 `~/Library/Application Support/go-screen-burn-in-fixer/`。關機功能第一次使用時，macOS 會詢問是否允許控制「系統事件」，請按允許。
+
+**Linux**：
+
+```
+tar xzf go-screen-burn-in-fixer-<版本>-linux-amd64.tar.gz
+cd go-screen-burn-in-fixer-<版本>-linux-amd64
+./go-screen-burn-in-fixer
+```
+
+需要圖形桌面（X11，或 Wayland 下的 XWayland）與 OpenGL，Ubuntu 桌面版內建。播放時用 `systemd-inhibit` 與 `xdg-screensaver` 防止螢幕關閉；關機、睡眠使用 `systemctl poweroff`、`systemctl suspend`。
+
+**macOS 與 Linux 的限制**：螢幕名稱與 EDID 原生解析度目前只有 Windows 讀得到，其他系統的選單只顯示螢幕編號與解析度，`-list-monitors` 也不支援。
 
 ### 點兩下執行
 
@@ -189,7 +220,13 @@ go-screen-burn-in-fixer.exe -monitor all -shuffle -timer 1h -after sleep
 
 ## 建置
 
-需要 Go 1.27 以上：
+需要 Go 1.27 以上。全部平台的發布檔案（Windows exe、macOS .app、Linux tar.gz）一次建置到 `dist/release/`：
+
+```
+python tools/release/build.py
+```
+
+全部用 `CGO_ENABLED=0` 在任何系統上交叉編譯（Ebitengine 在 macOS、Linux 不需要 cgo）。只建置 Windows 版：
 
 ```
 go build -trimpath -ldflags "-s -w -H windowsgui" -o dist/go-screen-burn-in-fixer.exe .
