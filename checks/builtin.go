@@ -130,8 +130,8 @@ func (c *fillCheck) Draw(dst *ebiten.Image, step int, _ float64) {
 	dst.Fill(c.colors[step])
 }
 
-// GrayField：全畫面單一灰階，在 Min–Max 之間變化。自動時連續漸進（秒數是整個項目的時間），
-// 手動時平均分成 N 階；也可以用滑鼠右鍵拖曳調整。目前顯示的值（Value）由檢查畫面決定。
+// GrayField：全畫面單一灰階，Min–Max 平均分成 N 階，自動或手動依序前進（秒數是每一階的時間）；
+// 也可以用滑鼠右鍵拖曳調整。目前顯示的值（Value）由檢查畫面決定。
 type GrayField struct {
 	Min, Max, N int
 	Value       int
@@ -146,7 +146,7 @@ func ClampGrayField(lo, hi, n int) (int, int, int) {
 	return lo, hi, min(max(n, MinGrayFieldSteps), MaxGrayFieldSteps)
 }
 
-// Levels 回傳手動時的每一階：Min 到 Max 平均分成 N 階，但不超過範圍內的灰階數
+// Levels 回傳每一階：Min 到 Max 平均分成 N 階，但不超過範圍內的灰階數
 // （例如 3–4 只有 2 階，Min = Max 只有 1 階）。
 func (g *GrayField) Levels() []int {
 	k := min(g.N, g.Max-g.Min+1)
@@ -160,19 +160,13 @@ func (g *GrayField) Levels() []int {
 	return ls
 }
 
-// At 回傳自動漸進到 frac（0–1）時的灰階。
-func (g *GrayField) At(frac float64) int {
-	frac = min(max(frac, 0), 1)
-	return int(math.Round(float64(g.Min) + float64(g.Max-g.Min)*frac))
-}
-
 // GrayLabel 回傳灰階的說明，例如「灰階 128（50.2%）」；百分比是訊號值的比例。
 func GrayLabel(v int) string {
 	return fmt.Sprintf("灰階 %d（%.1f%%）", v, float64(v)*100/255)
 }
 
 func (*GrayField) Name() string        { return "gray-field" }
-func (*GrayField) Description() string { return "灰階全畫面（最暗到最亮漸進）" }
+func (*GrayField) Description() string { return "灰階全畫面（最暗到最亮分階）" }
 func (*GrayField) Hint() string {
 	return "找出比周圍暗（或亮）的影子，例如工作列、圖示、視窗邊框、遊戲 HUD。烙印在 18–35% 最容易看出來。按住右鍵左右拖曳可調整灰階。"
 }

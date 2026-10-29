@@ -30,7 +30,7 @@
 
 | 預覽 | 名稱 | 檢查什麼 |
 |---|---|---|
-| [checks/gray-field.png](checks/gray-field.png) | `gray-field` | 灰階全畫面，預設 13–191 手動 7 階（自動時連續漸進）：烙印的影子（18–35% 最明顯） |
+| [checks/gray-field.png](checks/gray-field.png) | `gray-field` | 灰階全畫面，預設 13–191 共 7 階：烙印的影子（18–35% 最明顯） |
 | [checks/gray-steps.png](checks/gray-steps.png) | `gray-steps` | 灰階分階，階數可自訂（2–256；預覽為 16、32、64、256 階）：螢幕能分辨的灰階數、暗部細節 |
 | [checks/color-field.png](checks/color-field.png) | `color-field` | 紅、綠、藍各 25、50、100%：子像素老化不平均、判斷哪個子像素壞了 |
 | [checks/retention-test.png](checks/retention-test.png)（[影片](checks/retention-test.mp4)） | `retention-test` | 黑白格紋 10 秒後切換成灰色：暫時性殘影多久消失 |

@@ -224,10 +224,10 @@ go build -trimpath -ldflags "-s -w -H windowsgui" -o dist/go-screen-burn-in-fixe
   - H：切換顯示／隱藏（任何設定下都有效）。
 
 ### 灰階全畫面（`checks.GrayField`）
-- 設定 `grayMin`、`grayMax`（0–255，預設 13、191，約 5–75%）與 `grayFieldSteps`（手動階數 4–15，預設 7）。選單在「灰階全畫面」列，三個欄位都可 ◀▶ 或直接輸入；調整最暗超過最亮時另一個跟著推（`ClampGrayField` 讀檔時則交換）。
-- **自動**：秒數是整個項目的時間，從最暗連續漸進到最亮（`At(frac)`），所以序列中只有 1 階。
-- **手動**：`Levels()` 平均分成 n 階，但不超過 max−min+1（3–4 只有 2 階）。Enter 跳到下一個比目前亮的階，← 跳到比目前暗的階，到頭時換項目。
-- **右鍵拖曳**：整個螢幕寬度 = 最暗到最亮；一拖曳就切換成手動（使用者指定）。狀態在 `app/check.go` 的 `grayState`，畫之前寫入 `GrayField.Value`。多螢幕用 `gray <值>` 指令同步。
+- 設定 `grayMin`、`grayMax`（0–255，預設 13、191，約 5–75%）與 `grayFieldSteps`（階數 4–15，預設 7）。選單在「灰階全畫面」列，三個欄位都可 ◀▶ 或直接輸入；調整最暗超過最亮時另一個跟著推（`ClampGrayField` 讀檔時則交換）。
+- `Levels()` 平均分成 n 階，但不超過 max−min+1（3–4 只有 2 階）。**自動與手動都是分階前進**（使用者試過連續漸進後，改回與舊版相同的分階）：自動時秒數是每一階的時間；Enter 跳到下一個比目前亮的階，← 跳到比目前暗的階，到頭時換項目。
+- 序列（`CheckSequence`）中灰階全畫面只佔 1 個 `CheckStep`，各階由 checkScene 的 `grayState` 管理；選單與 `checkSummary` 的階數用 `Config.stepCount`。
+- **右鍵拖曳**：整個螢幕寬度 = 最暗到最亮；一拖曳就切換成手動（使用者指定）。狀態在 `app/check.go` 的 `grayState`，畫之前寫入 `GrayField.Value`。多螢幕用 `gray <值> <0|1 手動>` 指令同步。
 - 資訊列：`灰階 128（50.2%）　項目 1/8，第 4/7 階`（拖曳到兩階之間顯示「第 3–4/7 階之間」）。百分比是訊號值 ÷ 255，不是亮度。
 
 ## 12. 多螢幕與洗牌播放（已實作）

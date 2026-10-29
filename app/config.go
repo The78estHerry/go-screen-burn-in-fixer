@@ -294,6 +294,16 @@ func (c Config) applyChecks() {
 	}
 }
 
+// stepCount 回傳檢查項目的階數；灰階全畫面是依設定算出的灰階階數。
+func (c Config) stepCount(ck checks.Check) int {
+	if _, ok := ck.(*checks.GrayField); ok {
+		g := checks.GrayField{}
+		g.Min, g.Max, g.N = checks.ClampGrayField(c.GrayMin, c.GrayMax, c.GrayFieldN)
+		return len(g.Levels())
+	}
+	return len(ck.Steps())
+}
+
 // CheckSequence 依勾選的項目展開成依序顯示的每一階，並套用灰階分階與灰階全畫面的設定。
 func (c Config) CheckSequence() []CheckStep {
 	c.applyChecks()

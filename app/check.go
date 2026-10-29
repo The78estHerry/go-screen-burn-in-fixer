@@ -33,7 +33,7 @@ type checkScene struct {
 // grayState 是灰階全畫面（checks.GrayField）目前的狀態。
 type grayState struct {
 	value    int  // 目前顯示的灰階
-	manual   bool // 手動：設定為手動，或用右鍵拖曳過（自動漸進就此停止）
+	manual   bool // 手動：設定為手動，或用右鍵拖曳過（自動前進就此停止）
 	dragging bool
 	dragX    int // 開始拖曳時的游標 x
 	dragFrom int // 開始拖曳時的灰階
@@ -52,14 +52,15 @@ func (s *checkScene) grayField() (*checks.GrayField, bool) {
 	return g, ok
 }
 
-// resetGray 在進入一個項目時重設灰階狀態：自動從最暗開始漸進；手動停在第一階（atEnd 時停在最後一階）。
+// resetGray 在進入一個項目時重設灰階狀態：從第一階開始（atEnd 時從最後一階開始）。
 func (s *checkScene) resetGray(atEnd bool) {
 	g, ok := s.grayField()
 	if !ok {
 		return
 	}
-	s.gray = grayState{manual: s.seq[s.idx].Seconds == Manual, value: g.Min}
-	if ls := g.Levels(); s.gray.manual && atEnd {
+	ls := g.Levels()
+	s.gray = grayState{manual: s.seq[s.idx].Seconds == Manual, value: ls[0]}
+	if atEnd {
 		s.gray.value = ls[len(ls)-1]
 	}
 }
@@ -72,7 +73,7 @@ func (s *checkScene) setGray(v int) {
 	s.gray.manual, s.gray.value = true, v
 }
 
-// stepDuration 回傳目前這一階自動前進前的顯示時間；手動時回傳 0。
+// stepDuration 回傳目前這一階自動前進前的顯示時間；手動時回傳 0。灰階全畫面是每一個灰階階的時間。
 func (s *checkScene) stepDuration() time.Duration {
 	st := s.seq[s.idx]
 	if st.Seconds == Manual {
@@ -163,7 +164,7 @@ func (s *checkScene) command(a *App, cmd string) error {
 	case "esc":
 		return s.finish(a, true)
 	case "next":
-		if g, ok := s.grayField(); ok && s.gray.manual {
+		if g, ok := s.grayField(); ok {
 			if v, ok := nextLevel(g.Levels(), s.gray.value, 1); ok {
 				s.gray.value = v
 				s.stepStart = time.Now()
@@ -176,7 +177,7 @@ func (s *checkScene) command(a *App, cmd string) error {
 		}
 		s.goTo(s.idx + 1)
 	case "prev":
-		if g, ok := s.grayField(); ok && s.gray.manual {
+		if g, ok := s.grayField(); ok {
 			if v, ok := nextLevel(g.Levels(), s.gray.value, -1); ok {
 				s.gray.value = v
 				s.stepStart = time.Now()
@@ -186,7 +187,7 @@ func (s *checkScene) command(a *App, cmd string) error {
 		}
 		if s.idx > 0 {
 			s.goTo(s.idx - 1)
-			s.resetGray(true) // 從後面回到灰階全畫面（手動）時停在最後一階
+			s.resetGray(true) // 從後面回到灰階全畫面時停在最後一階
 		} else {
 			s.goTo(0)
 		}
@@ -198,25 +199,35 @@ func (s *checkScene) command(a *App, cmd string) error {
 }
 
 // sync 把目前的階與已顯示的時間送給所有子程式（殘影測試依時間切換畫面）；
-// 灰階全畫面切換成手動後，另外送出目前的灰階。
+// 灰階全畫面另外送出目前的灰階與是否已切換成手動。
 func (s *checkScene) sync(a *App) {
 	a.broadcast("step %d %d", s.idx, int64(time.Since(s.stepStart)))
-	if _, ok := s.grayField(); ok && s.gray.manual {
-		a.broadcast("gray %d", s.gray.value)
+	if _, ok := s.grayField(); ok {
+		manual := 0
+		if s.gray.manual {
+			manual = 1
+		}
+		a.broadcast("gray %d %d", s.gray.value, manual)
 	}
 }
 
 func (s *checkScene) remote(a *App, cmd string, args []string) error {
-	if cmd == "gray" && len(args) == 1 {
+	if cmd == "gray" && len(args) >= 1 {
 		v, err := strconv.Atoi(args[0])
 		g, ok := s.grayField()
 		if err != nil || !ok || s.gray.dragging { // 自己正在拖曳時以自己的為準
 			return nil
 		}
-		s.setGray(min(max(v, g.Min), g.Max))
-		if a.up == nil { // 主程式：子程式拖曳了灰階，同步到其他螢幕
+		v = min(max(v, g.Min), g.Max)
+		if a.up == nil { // 主程式：子程式拖曳了灰階，切換成手動並同步到其他螢幕
+			s.setGray(v)
 			s.sync(a)
+			return nil
 		}
+		if v != s.gray.value {
+			s.info.flash()
+		}
+		s.gray.value, s.gray.manual = v, len(args) < 2 || args[1] == "1"
 		return nil
 	}
 	if a.up == nil { // 主程式：子程式回報的按鍵
@@ -236,14 +247,9 @@ func (s *checkScene) remote(a *App, cmd string, args []string) error {
 	return nil
 }
 
-// updateGray 更新灰階全畫面：自動時依經過時間漸進；按住右鍵左右拖曳時調整灰階並切換成手動
+// updateGray 處理灰階全畫面的右鍵拖曳：左右拖曳調整灰階並切換成手動
 // （拖曳整個螢幕寬度等於從最暗到最亮）。
 func (s *checkScene) updateGray(a *App, g *checks.GrayField, cx int) {
-	if !s.gray.manual {
-		if d := time.Duration(s.seq[s.idx].Seconds) * time.Second; d > 0 {
-			s.gray.value = g.At(float64(time.Since(s.stepStart)) / float64(d))
-		}
-	}
 	switch {
 	case inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonRight):
 		s.gray.dragging, s.gray.dragX, s.gray.dragFrom = true, cx, s.gray.value
@@ -338,11 +344,8 @@ func (s *checkScene) Draw(a *App, screen *ebiten.Image) {
 	steps := st.Check.Steps()
 	line1 := fmt.Sprintf("%s（項目 %d/%d，第 %d/%d 階）", steps[st.Step], st.Index+1, st.Items, st.Step+1, len(steps))
 	if isGray {
-		pos := fmt.Sprintf("%d–%d 漸進", g.Min, g.Max)
-		if s.gray.manual {
-			pos = grayPosition(g.Levels(), s.gray.value)
-		}
-		line1 = fmt.Sprintf("%s　項目 %d/%d，%s", checks.GrayLabel(s.gray.value), st.Index+1, st.Items, pos)
+		line1 = fmt.Sprintf("%s　項目 %d/%d，%s", checks.GrayLabel(s.gray.value), st.Index+1, st.Items,
+			grayPosition(g.Levels(), s.gray.value))
 	}
 	if d := s.stepDuration(); d > 0 {
 		line1 += "　剩餘 " + formatDuration(d-time.Since(s.stepStart))

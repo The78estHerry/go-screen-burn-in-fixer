@@ -28,18 +28,6 @@ func TestGrayFieldLevels(t *testing.T) {
 	}
 }
 
-func TestGrayFieldAt(t *testing.T) {
-	g := GrayField{Min: 13, Max: 191}
-	for _, tc := range []struct {
-		frac float64
-		want int
-	}{{-1, 13}, {0, 13}, {0.5, 102}, {1, 191}, {2, 191}} {
-		if got := g.At(tc.frac); got != tc.want {
-			t.Errorf("At(%v) = %d，預期 %d", tc.frac, got, tc.want)
-		}
-	}
-}
-
 func TestClampGrayField(t *testing.T) {
 	lo, hi, n := ClampGrayField(300, -5, 99)
 	if lo != 0 || hi != 255 || n != MaxGrayFieldSteps {

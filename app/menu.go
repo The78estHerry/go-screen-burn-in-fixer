@@ -454,22 +454,18 @@ func infoBarRow(cfg *Config, y float64, disabled bool) item {
 
 // ── 檢查畫面 ─────────────────────────────────────────────
 
-// checkPreview 在預覽框輪流顯示檢查項目的每一階（殘影測試則依時間顯示格紋與灰色；
-// 灰階全畫面則每 4 秒從最暗漸進到最亮一次）。
+// checkPreview 在預覽框輪流顯示檢查項目的每一階（殘影測試則依時間顯示格紋與灰色）。
 func checkPreview(ck checks.Check, cfg *Config) func(*ebiten.Image, int) {
+	if _, ok := ck.(*checks.GrayField); ok {
+		return grayLevelsPreview(cfg)
+	}
 	return func(dst *ebiten.Image, frame int) {
 		cfg.applyChecks()
 		n := len(ck.Steps())
 		t := float64(frame) / 60
-		if g, ok := ck.(*checks.GrayField); ok {
-			g.Value = g.At(mod(t, grayPreviewSeconds) / grayPreviewSeconds)
-		}
 		ck.Draw(dst, (frame/90)%n, mod(t, checks.RetentionPatternSeconds+4))
 	}
 }
-
-// grayPreviewSeconds 是預覽框中灰階全畫面從最暗漸進到最亮的秒數。
-const grayPreviewSeconds = 4
 
 // grayValuePreview 在預覽框顯示單一灰階（選到最暗、最亮欄位時）。
 func grayValuePreview(v func() int) func(*ebiten.Image, int) {
@@ -479,7 +475,7 @@ func grayValuePreview(v func() int) func(*ebiten.Image, int) {
 	}
 }
 
-// grayLevelsPreview 在預覽框輪流顯示手動時的每一階（選到階數欄位時）。
+// grayLevelsPreview 在預覽框輪流顯示灰階全畫面的每一階。
 func grayLevelsPreview(cfg *Config) func(*ebiten.Image, int) {
 	return func(dst *ebiten.Image, frame int) {
 		cfg.applyChecks()
@@ -550,10 +546,10 @@ func (m *menuScene) checkItems(cfg *Config) []item {
 		case *checks.GraySteps:
 			desc = func() string { return fmt.Sprintf("灰階分階 %d 階", cfg.GrayLevels) }
 		case *checks.GrayField:
-			desc = func() string { return fmt.Sprintf("灰階 %d–%d 漸進", cfg.GrayMin, cfg.GrayMax) }
+			desc = func() string { return fmt.Sprintf("灰階 %d–%d", cfg.GrayMin, cfg.GrayMax) }
 		}
 		items = append(items, listRow(i, it.Check, desc, &it.Enabled,
-			func() string { return checkSecondsLabel(it.Seconds, len(ck.Steps())) },
+			func() string { return checkSecondsLabel(it.Seconds, cfg.stepCount(ck)) },
 			func() { it.Seconds = step(checkSecondsChoices, it.Seconds, -1) },
 			func() { it.Seconds = step(checkSecondsChoices, it.Seconds, 1) },
 			false, preview))
@@ -664,7 +660,7 @@ func (m *menuScene) grayFieldItems(cfg *Config) []item {
 			grayValuePreview(func() int { return cfg.GrayMin })),
 		field("gmax", "最亮", colValue+150, 96, func() int { return cfg.GrayMax }, setMax, 0, 255,
 			grayValuePreview(func() int { return cfg.GrayMax })),
-		field("gn", "手動", colValue+300, 86, func() int { return cfg.GrayFieldN }, func(v int) { cfg.GrayFieldN = v },
+		field("gn", "階數", colValue+300, 86, func() int { return cfg.GrayFieldN }, func(v int) { cfg.GrayFieldN = v },
 			checks.MinGrayFieldSteps, checks.MaxGrayFieldSteps, grayLevelsPreview(cfg)),
 	}
 	items[0].draw = wrapDraw(items[0].draw, func(p *painter) {
@@ -1006,7 +1002,7 @@ func checkSummary(seq []CheckStep) string {
 	steps := 0
 	for _, st := range seq {
 		n := 1
-		if g, ok := st.Check.(*checks.GrayField); ok && st.Seconds == Manual {
+		if g, ok := st.Check.(*checks.GrayField); ok {
 			n = len(g.Levels())
 		}
 		steps += n
@@ -1014,7 +1010,7 @@ func checkSummary(seq []CheckStep) string {
 			manual += n
 			continue
 		}
-		total += time.Duration(st.Seconds) * time.Second
+		total += time.Duration(st.Seconds*n) * time.Second
 		if st.Check.Name() == "retention-test" {
 			total += checks.RetentionPatternSeconds * time.Second
 		}
