@@ -1021,8 +1021,45 @@ func (m *menuScene) Draw(a *App, screen *ebiten.Image) {
 	if e := items[focus].edit; e != nil && !items[focus].disabled {
 		hint, hintColor = e.hint, ui.ColorDim
 	}
-	p.text(hint, colLabel, 684, 13, hintColor, ui.Left)
+	// 提示在左下角、開始按鈕的左邊；太長時換行，行數多時往上排（最後一行位置不變）。
+	lines := wrapText(hint, 13, hintMaxW)
+	for i, l := range lines {
+		p.text(l, colLabel, 684-float64(len(lines)-1-i)*hintLineH, 13, hintColor, ui.Left)
+	}
 	m.drawPreview(a, p, items, focus)
+}
+
+// 選單左下角提示的寬度上限（到開始按鈕左邊）與行高。
+const (
+	hintMaxW  = 620 - 16 - colLabel
+	hintLineH = 18.0
+)
+
+// wrapText 把文字依寬度換行，優先在標點（、，；）與全形空白之後斷開。
+func wrapText(s string, size, maxW float64) []string {
+	var segs []string
+	start := 0
+	for i, r := range s {
+		if strings.ContainsRune("、，；　", r) {
+			end := i + len(string(r))
+			segs = append(segs, s[start:end])
+			start = end
+		}
+	}
+	if start < len(s) {
+		segs = append(segs, s[start:])
+	}
+	var lines []string
+	cur := ""
+	for _, seg := range segs {
+		if w, _ := ui.Measure(cur+seg, size); cur != "" && w > maxW {
+			lines = append(lines, strings.TrimRight(cur, "　"))
+			cur = strings.TrimLeft(seg, "　")
+			continue
+		}
+		cur += seg
+	}
+	return append(lines, strings.TrimRight(cur, "　"))
 }
 
 // checkSummary 回傳檢查流程的總時間說明。
