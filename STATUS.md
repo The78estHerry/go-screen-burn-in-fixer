@@ -4,7 +4,7 @@
 
 ## 目前進度
 
-最新版本 **v0.3.0**，Release 附 Windows / macOS（Apple Silicon、Intel）/ Linux x64 四個檔案：
+最新版本 **v0.3.1**，Release 附 Windows / macOS（Apple Silicon、Intel）/ Linux x64 四個檔案：
 https://gitea.littleherry.work/The78estWorld/go-screen-burn-in-fixer/releases
 
 | 版本 | 內容 |
@@ -13,6 +13,7 @@ https://gitea.littleherry.work/The78estWorld/go-screen-burn-in-fixer/releases
 | v0.2.0 | 多螢幕同時播放、洗牌播放、播放時間直接輸入、EDID 擴充區塊、exe 圖示與版本資訊、選單反白修正 |
 | v0.2.1 | macOS 與 Linux 版本、播放結束後選單回到原本的螢幕 |
 | v0.3.0 | 灰階全畫面：可設定最暗／最亮／階數、右鍵拖曳調整灰階、資訊列顯示數值與百分比 |
+| v0.3.1 | 播放時間可選 10 秒–1 分鐘並可輸入秒數（`10s`、`3m`、`3h`）、倒數與提示文字呼吸效果、選單提示自動換行 |
 
 功能都已實作，自動測試（`go vet`、`go test`）與能在單一螢幕上做的流程測試都通過。**目前沒有進行中、做到一半的工作。**
 
@@ -31,8 +32,8 @@ https://gitea.littleherry.work/The78estWorld/go-screen-burn-in-fixer/releases
 - [x] 洗牌播放：資訊列「本輪 已播放 / 總時間」、圖樣交錯是否符合預期。（2026-10-29 使用者確認）
 - [x] 真的關機 / 睡眠（先用 `-dry-run` 測，再實際試）。（2026-10-29 使用者確認）
 
-- [x] 播放時間：◀ 可選到 1 分鐘、30 秒、10 秒；直接輸入 `10s`、`3m`、`3h`、`1m30s`；提示太長時換行（未發布）。（2026-10-29 使用者確認）
-- [x] 倒數（關機／睡眠）、警告、訊息畫面與資訊列的文字呼吸效果（未發布）。（2026-10-29 使用者確認）
+- [x] 播放時間：◀ 可選到 1 分鐘、30 秒、10 秒；直接輸入 `10s`、`3m`、`3h`、`1m30s`；提示太長時換行（v0.3.1）。（2026-10-29 使用者確認）
+- [x] 倒數（關機／睡眠）、警告、訊息畫面與資訊列的文字呼吸效果（v0.3.1）。（2026-10-29 使用者確認）
 
 ### macOS（完全沒有實測，只確認能編譯、檔案格式正確）
 - [ ] Apple Silicon 與 Intel 各自能開啟；「強制打開」或 `xattr -cr` 的流程與 README 說的一致。
