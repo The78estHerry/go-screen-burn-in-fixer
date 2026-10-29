@@ -262,4 +262,4 @@ go build -trimpath -ldflags "-s -w -H windowsgui" -o dist/go-screen-burn-in-fixe
 - [x] macOS（Apple Silicon / Intel）與 Linux x64 版本（`tools/release/build.py`）；播放結束後設定選單回到原本的螢幕與位置
 - [ ] macOS、Linux 實機測試
 - [x] EDID 原生解析度：也讀 CTA-861 與 DisplayID（Type I / VII）擴充區塊，取像素最多的詳細時序（超寬螢幕常把原生模式放在擴充區塊）
-- [ ] 使用者手動測試：全螢幕、選單操作、螢幕保護、檢查模式、多螢幕、真的關機 / 睡眠
+- [x] 使用者手動測試（Windows）：全螢幕、選單操作、螢幕保護、檢查模式、多螢幕、真的關機 / 睡眠
