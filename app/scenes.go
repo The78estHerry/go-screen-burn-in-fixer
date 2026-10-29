@@ -2,6 +2,7 @@ package app
 
 import (
 	"fmt"
+	"image/color"
 	"log"
 	"math"
 	"strconv"
@@ -43,7 +44,8 @@ func (warningScene) Draw(a *App, screen *ebiten.Image) {
 	screen.Fill(ui.ColorBackground)
 	s, ox, oy := uiScale(screen)
 	cx := ox + WindowWidth/2*s
-	ui.Text(screen, "⚠ 警告", cx, oy+150*s, 44*s, ui.ColorWarning, ui.Center)
+	f := breathNow()
+	ui.Text(screen, "⚠ 警告", cx, oy+150*s, 44*s, dimmed(ui.ColorWarning, f), ui.Center)
 	lines := []string{
 		"本程式內含快速閃爍的畫面。",
 		"光敏性癲癇患者或對閃光敏感的人請勿觀看，",
@@ -53,9 +55,9 @@ func (warningScene) Draw(a *App, screen *ebiten.Image) {
 		"本工具可能有助於減輕暫時性殘影或喚醒卡住的像素，但不保證有效。",
 	}
 	for i, l := range lines {
-		ui.Text(screen, l, cx, oy+(250+float64(i)*38)*s, 22*s, ui.ColorText, ui.Center)
+		ui.Text(screen, l, cx, oy+(250+float64(i)*38)*s, 22*s, dimmed(ui.ColorText, f), ui.Center)
 	}
-	ui.Text(screen, "按任意鍵或點一下繼續　　Esc 結束", cx, oy+560*s, 20*s, ui.ColorDim, ui.Center)
+	ui.Text(screen, "按任意鍵或點一下繼續　　Esc 結束", cx, oy+560*s, 20*s, dimmed(ui.ColorDim, f), ui.Center)
 }
 
 // ── 播放 Burn-In ─────────────────────────────────────────
@@ -294,13 +296,41 @@ func (s *countdownScene) Draw(a *App, screen *ebiten.Image) {
 	screen.Fill(ui.ColorBackground)
 	sc, ox, oy := uiScale(screen)
 	cx := ox + WindowWidth/2*sc
-	left := s.duration - time.Since(s.start)
-	ui.Text(screen, fmt.Sprintf("即將%s", s.action.Label()), cx, oy+200*sc, 40*sc, ui.ColorText, ui.Center)
-	ui.Text(screen, fmt.Sprintf("%d", int(math.Ceil(left.Seconds()))), cx, oy+280*sc, 120*sc, ui.ColorWarning, ui.Center)
-	ui.Text(screen, "按任意鍵、點一下或移動滑鼠取消", cx, oy+480*sc, 24*sc, ui.ColorDim, ui.Center)
+	elapsed := time.Since(s.start)
+	left := s.duration - elapsed
+	f := breath(elapsed) // 從最亮開始呼吸
+	ui.Text(screen, fmt.Sprintf("即將%s", s.action.Label()), cx, oy+200*sc, 40*sc, dimmed(ui.ColorText, f), ui.Center)
+	ui.Text(screen, fmt.Sprintf("%d", int(math.Ceil(left.Seconds()))), cx, oy+280*sc, 120*sc, dimmed(ui.ColorWarning, f), ui.Center)
+	ui.Text(screen, "按任意鍵、點一下或移動滑鼠取消", cx, oy+480*sc, 24*sc, dimmed(ui.ColorDim, f), ui.Center)
 	if a.opts.DryRun {
-		ui.Text(screen, "（測試模式：不會真的執行）", cx, oy+530*sc, 20*sc, ui.ColorDim, ui.Center)
+		ui.Text(screen, "（測試模式：不會真的執行）", cx, oy+530*sc, 20*sc, dimmed(ui.ColorDim, f), ui.Center)
 	}
+}
+
+// 呼吸效果：停留在畫面上的文字（倒數、警告、訊息、資訊列）亮度在 100% 與 breathMin 之間
+// 以餘弦曲線緩慢起伏，一個循環 breathPeriod，避免同樣亮度的文字一直停在同一個位置造成烙印。
+const (
+	breathPeriod = 6 * time.Second
+	breathMin    = 0.45
+)
+
+var breathStart = time.Now()
+
+// breathNow 回傳目前的亮度倍率（所有畫面共用同一個節奏）。
+func breathNow() float64 { return breath(time.Since(breathStart)) }
+
+// breath 回傳經過 t 時的亮度倍率（從 100% 開始）。
+func breath(t time.Duration) float64 {
+	phase := 2 * math.Pi * float64(t) / float64(breathPeriod)
+	return breathMin + (1-breathMin)*(0.5+0.5*math.Cos(phase))
+}
+
+// dimmed 把顏色朝背景色調暗：f = 1 是原色，f = 0 是背景色。
+func dimmed(c color.Color, f float64) color.Color {
+	r, g, b, _ := c.RGBA()
+	br, bg, bb, _ := ui.ColorBackground.RGBA()
+	mix := func(v, base uint32) uint8 { return uint8((float64(base) + (float64(v)-float64(base))*f) / 257) }
+	return color.RGBA{mix(r, br), mix(g, bg), mix(b, bb), 0xff}
 }
 
 // ── 螢幕保護 ─────────────────────────────────────────────
@@ -381,6 +411,7 @@ func (s *messageScene) Draw(a *App, screen *ebiten.Image) {
 	screen.Fill(ui.ColorBackground)
 	sc, ox, oy := uiScale(screen)
 	cx := ox + WindowWidth/2*sc
-	ui.Text(screen, s.msg, cx, oy+300*sc, 24*sc, ui.ColorText, ui.Center)
-	ui.Text(screen, "按任意鍵繼續", cx, oy+400*sc, 20*sc, ui.ColorDim, ui.Center)
+	f := breathNow()
+	ui.Text(screen, s.msg, cx, oy+300*sc, 24*sc, dimmed(ui.ColorText, f), ui.Center)
+	ui.Text(screen, "按任意鍵繼續", cx, oy+400*sc, 20*sc, dimmed(ui.ColorDim, f), ui.Center)
 }

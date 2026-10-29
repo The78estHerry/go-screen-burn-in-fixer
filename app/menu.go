@@ -306,13 +306,13 @@ func (m *menuScene) burnInItems(cfg *Config) []item {
 	// 播放時間 | 資訊列
 	{
 		y := rowBottom1
-		dec := func() { m.commitEdit(); cfg.TimerMinutes = stepSorted(timerMinutesChoices, cfg.TimerMinutes, -1) }
-		inc := func() { m.commitEdit(); cfg.TimerMinutes = stepSorted(timerMinutesChoices, cfg.TimerMinutes, 1) }
+		dec := func() { m.commitEdit(); cfg.TimerSeconds = stepSorted(timerSecondsChoices, cfg.TimerSeconds, -1) }
+		inc := func() { m.commitEdit(); cfg.TimerSeconds = stepSorted(timerSecondsChoices, cfg.TimerSeconds, 1) }
 		value := func() string {
 			if m.editKey == "timer" {
 				return m.editing + "▏"
 			}
-			return formatMinutes(cfg.TimerMinutes)
+			return formatTimer(cfg.TimerSeconds)
 		}
 		clicks, d := selector(colValue, y, 200, value, dec, inc, saverOnly)
 		items = append(items, item{
@@ -320,14 +320,14 @@ func (m *menuScene) burnInItems(cfg *Config) []item {
 			edit: &numEdit{
 				key: "timer",
 				accept: func(buf string, r rune) bool {
-					return len(buf) < 6 && (r >= '0' && r <= '9' || strings.ContainsRune(":hHmM", r))
+					return len(buf) < 9 && (r >= '0' && r <= '9' || strings.ContainsRune(":hHmMsS", r))
 				},
 				apply: func(buf string) {
 					if n, ok := parseTimerInput(buf); ok {
-						cfg.TimerMinutes = min(n, MaxTimerMinutes)
+						cfg.TimerSeconds = min(n, MaxTimerSeconds)
 					}
 				},
-				hint: fmt.Sprintf("可直接輸入：90（分鐘）、3h（小時）、2:30（時:分），最長 %d 小時", MaxTimerMinutes/60),
+				hint: fmt.Sprintf("可直接輸入：90（分鐘）、10s（秒）、3m（分鐘）、3h（小時）、2:30（時:分）、1m30s，最長 %d 小時", MaxTimerSeconds/3600),
 			},
 			draw: func(p *painter, focused, _ bool) {
 				p.text("播放時間", colLabel, y, 17, dimColor(saverOnly), ui.Left)
@@ -734,46 +734,76 @@ func (m *menuScene) cancelEdit() {
 	m.editKey, m.editing, m.editApply = "", "", nil
 }
 
-// formatMinutes 把播放時間格式化成「N 分鐘」「N 小時」「N 小時 M 分」。
-func formatMinutes(min int) string {
-	switch {
-	case min < 60:
-		return fmt.Sprintf("%d 分鐘", min)
-	case min%60 == 0:
-		return fmt.Sprintf("%d 小時", min/60)
+// formatTimer 把播放時間（秒）格式化成「10 秒」「5 分鐘」「1 分 30 秒」「2 小時」「2 小時 30 分」。
+func formatTimer(sec int) string {
+	h, m, s := sec/3600, sec/60%60, sec%60
+	var parts []string
+	if h > 0 {
+		parts = append(parts, fmt.Sprintf("%d 小時", h))
 	}
-	return fmt.Sprintf("%d 小時 %d 分", min/60, min%60)
+	switch {
+	case m > 0 && h == 0 && s == 0:
+		parts = append(parts, fmt.Sprintf("%d 分鐘", m))
+	case m > 0 || h > 0 && s > 0:
+		parts = append(parts, fmt.Sprintf("%d 分", m))
+	}
+	if s > 0 || len(parts) == 0 {
+		parts = append(parts, fmt.Sprintf("%d 秒", s))
+	}
+	return strings.Join(parts, " ")
 }
 
-// parseTimerInput 解析直接輸入的播放時間，回傳分鐘數：
-// "90"（分鐘）、"3h"（小時）、"2:30"（小時:分）、"2h30" 或 "2h30m"、"45m"。
+// parseTimerInput 解析直接輸入的播放時間，回傳秒數：
+// "90"（沒有單位是分鐘）、"10s"（秒）、"3m"（分鐘）、"3h"（小時）、"2:30"（小時:分）、
+// 單位可以組合，例如 "2h30m"、"1m30s"、"1h5m10s"。單位後面沒有單位的數字是下一個較小的單位
+// （"2h30" 是 2 小時 30 分、"1m30" 是 1 分 30 秒）。
 func parseTimerInput(s string) (int, bool) {
 	s = strings.ToLower(strings.TrimSpace(s))
-	atoi := func(t string) (int, bool) {
-		if t == "" {
-			return 0, true
+	if hs, ms, ok := strings.Cut(s, ":"); ok {
+		h, err1 := atoiEmpty(hs)
+		m, err2 := atoiEmpty(ms)
+		total := h*3600 + m*60
+		return total, err1 == nil && err2 == nil && total > 0
+	}
+	units := map[byte]int{'h': 3600, 'm': 60, 's': 1}
+	next := map[int]int{3600: 60, 60: 1}
+	total, num, last := 0, "", 0
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		if c >= '0' && c <= '9' {
+			num += string(c)
+			continue
 		}
-		n, err := strconv.Atoi(t)
-		return n, err == nil && n >= 0
+		u, ok := units[c]
+		if !ok || num == "" || last != 0 && u >= last { // 單位要由大到小，不可重複
+			return 0, false
+		}
+		n, _ := strconv.Atoi(num)
+		total += n * u
+		num, last = "", u
 	}
-	var h, m int
-	var ok1, ok2 bool
-	switch {
-	case strings.Contains(s, ":"):
-		hs, ms, _ := strings.Cut(s, ":")
-		h, ok1 = atoi(hs)
-		m, ok2 = atoi(ms)
-	case strings.Contains(s, "h"):
-		hs, ms, _ := strings.Cut(s, "h")
-		h, ok1 = atoi(hs)
-		m, ok2 = atoi(strings.TrimSuffix(ms, "m"))
-		ok1 = ok1 && hs != ""
-	default:
-		m, ok2 = atoi(strings.TrimSuffix(s, "m"))
-		ok1 = s != "" && s != "m"
+	if num != "" {
+		u := 60 // 沒有單位：分鐘
+		if last != 0 {
+			if u = next[last]; u == 0 { // 秒後面不能再接數字
+				return 0, false
+			}
+		}
+		n, _ := strconv.Atoi(num)
+		total += n * u
 	}
-	total := h*60 + m
-	return total, ok1 && ok2 && total > 0
+	return total, total > 0
+}
+
+func atoiEmpty(t string) (int, error) {
+	if t == "" {
+		return 0, nil
+	}
+	n, err := strconv.Atoi(t)
+	if err == nil && n < 0 {
+		err = strconv.ErrRange
+	}
+	return n, err
 }
 
 // ── 互動 ─────────────────────────────────────────────────

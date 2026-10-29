@@ -73,13 +73,14 @@ func (b *infoBar) draw(screen *ebiten.Image, lines ...string) {
 	h := size*1.4 + float64(len(lines)-1)*small*1.5 + 20*s
 	ui.Fill(screen, ui.Rect{X: 16 * s, Y: 16 * s, W: w + 32*s, H: h}, ui.ColorHUD)
 	y := 26 * s
+	f := breathNow() // 資訊列可能一直顯示，文字也會呼吸
 	for i, l := range lines {
 		if i == 0 {
-			ui.Text(screen, l, 32*s, y, size, ui.ColorText, ui.Left)
+			ui.Text(screen, l, 32*s, y, size, dimmed(ui.ColorText, f), ui.Left)
 			y += size * 1.45
 			continue
 		}
-		ui.Text(screen, l, 32*s, y, small, ui.ColorDim, ui.Left)
+		ui.Text(screen, l, 32*s, y, small, dimmed(ui.ColorDim, f), ui.Left)
 		y += small * 1.5
 	}
 }

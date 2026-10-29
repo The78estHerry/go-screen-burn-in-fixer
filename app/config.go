@@ -69,7 +69,7 @@ type Config struct {
 	Segments     []SegmentConfig `json:"segments"`
 	Shuffle      bool            `json:"shuffle"`      // Burn-In 圖樣洗牌播放
 	ShuffleSlice int             `json:"shuffleSlice"` // 洗牌時每段的秒數；program.RandomSlice（0）代表隨機
-	TimerMinutes int             `json:"timerMinutes"`
+	TimerSeconds int             `json:"timerSeconds"` // 播放時間（秒）
 	After        actions.After   `json:"after"`
 	Screensaver  string          `json:"screensaver"`
 	SaverExit    SaverExit       `json:"saverExit"`
@@ -84,6 +84,8 @@ type Config struct {
 	// 舊版設定檔的欄位（單一螢幕）：讀取後轉換成 Monitors、MonitorMarks。
 	LegacyMonitor int    `json:"monitor,omitempty"`
 	LegacyMarks   []Mark `json:"marks,omitempty"`
+	// v0.3.0 以前的播放時間（分鐘）：讀取後轉換成 TimerSeconds。
+	LegacyTimerMinutes int `json:"timerMinutes,omitempty"`
 
 	InfoBar int `json:"infoBar"` // 資訊列：InfoHidden、InfoAlways 或顯示秒數
 }
@@ -91,14 +93,15 @@ type Config struct {
 // 選單中可選擇的數值。
 var (
 	segmentSecondsChoices = []int{10, 15, 20, 30, 45, 60, 90, 120, 180, 300, 600}
-	timerMinutesChoices   = []int{5, 10, 15, 20, 30, 45, 50, 60, 90, 120, 180, 240, 300, 360, 480, 600, 720, 1440}
-	checkSecondsChoices   = []int{Manual, 5, 10, 15, 20, 30, 45, 60, 120}
-	infoBarChoices        = []int{InfoHidden, 3, 5, 10, InfoAlways}
-	shuffleSliceChoices   = []int{program.RandomSlice, 10, 20, 30, 60}
+	timerSecondsChoices   = []int{10, 30, 60, 5 * 60, 10 * 60, 15 * 60, 20 * 60, 30 * 60, 45 * 60, 50 * 60, 60 * 60, 90 * 60,
+		2 * 3600, 3 * 3600, 4 * 3600, 5 * 3600, 6 * 3600, 8 * 3600, 10 * 3600, 12 * 3600, 24 * 3600}
+	checkSecondsChoices = []int{Manual, 5, 10, 15, 20, 30, 45, 60, 120}
+	infoBarChoices      = []int{InfoHidden, 3, 5, 10, InfoAlways}
+	shuffleSliceChoices = []int{program.RandomSlice, 10, 20, 30, 60}
 )
 
-// MaxTimerMinutes 是播放時間的上限（選單可以直接輸入任意分鐘數）。
-const MaxTimerMinutes = 72 * 60
+// MaxTimerSeconds 是播放時間的上限（選單可以直接輸入任意時間）。
+const MaxTimerSeconds = 72 * 3600
 
 // DefaultCheckSeconds 是檢查項目「自動」時的預設秒數。
 const DefaultCheckSeconds = 10
@@ -109,7 +112,7 @@ func DefaultConfig() Config {
 	c := Config{
 		Mode:         ModeBurnIn,
 		Monitors:     []int{0},
-		TimerMinutes: 50,
+		TimerSeconds: 50 * 60,
 		After:        actions.Screensaver,
 		Screensaver:  screensaver.All()[0].Name(),
 		SaverExit:    SaverExitMenu,
@@ -208,8 +211,12 @@ func (c *Config) normalize() {
 	if c.SaverExit != SaverExitMenu && c.SaverExit != SaverExitQuit {
 		c.SaverExit = def.SaverExit
 	}
-	if c.TimerMinutes <= 0 || c.TimerMinutes > MaxTimerMinutes {
-		c.TimerMinutes = def.TimerMinutes
+	if c.LegacyTimerMinutes > 0 {
+		c.TimerSeconds = c.LegacyTimerMinutes * 60
+		c.LegacyTimerMinutes = 0
+	}
+	if c.TimerSeconds <= 0 || c.TimerSeconds > MaxTimerSeconds {
+		c.TimerSeconds = def.TimerSeconds
 	}
 	c.ShuffleSlice = nearest(shuffleSliceChoices, c.ShuffleSlice)
 	if c.LegacyMonitor > 0 && (len(c.Monitors) == 0 || len(c.Monitors) == 1 && c.Monitors[0] == 0) {
@@ -270,7 +277,7 @@ func (c *Config) ClearMarks() {
 
 // Timer 回傳播放時間。
 func (c Config) Timer() time.Duration {
-	return time.Duration(c.TimerMinutes) * time.Minute
+	return time.Duration(c.TimerSeconds) * time.Second
 }
 
 // CheckStep 是檢查流程中的一階。

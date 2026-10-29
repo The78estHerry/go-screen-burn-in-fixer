@@ -2,11 +2,13 @@ package app
 
 import (
 	"encoding/json"
+	"math"
 	"os"
 	"path/filepath"
 	"testing"
 
 	"gitea.littleherry.work/The78estWorld/go-screen-burn-in-fixer/checks"
+	"gitea.littleherry.work/The78estWorld/go-screen-burn-in-fixer/internal/ui"
 )
 
 func TestCheckSequence(t *testing.T) {
@@ -186,24 +188,63 @@ func TestCheckSpec(t *testing.T) {
 }
 
 func TestParseTimerInput(t *testing.T) {
-	cases := map[string]int{"90": 90, "3h": 180, "3H": 180, "2:30": 150, "2h30": 150, "2h30m": 150, "45m": 45, "1:05": 65, "0:45": 45, ":30": 30}
+	cases := map[string]int{"90": 5400, "3h": 10800, "3H": 10800, "2:30": 9000, "2h30": 9000, "2h30m": 9000, "45m": 2700,
+		"1:05": 3900, "0:45": 2700, ":30": 1800, "10s": 10, "10S": 10, "3m": 180, "1m30s": 90, "1m30": 90, "1h5m10s": 3910, "1h10s": 3610}
 	for in, want := range cases {
 		if got, ok := parseTimerInput(in); !ok || got != want {
 			t.Errorf("parseTimerInput(%q) = %d, %v，預期 %d", in, got, ok, want)
 		}
 	}
-	for _, in := range []string{"", "h", "m", "0", "0:00", "abc", "1:x", "h30"} {
+	for _, in := range []string{"", "h", "m", "s", "0", "0s", "0:00", "abc", "1:x", "h30", "10s5", "1m2h", "1s1s", "1x"} {
 		if _, ok := parseTimerInput(in); ok {
 			t.Errorf("parseTimerInput(%q) 應該無效", in)
 		}
 	}
-	if got := stepSorted(timerMinutesChoices, 100, 1); got != 120 {
-		t.Errorf("stepSorted(100, +1) = %d，預期 120", got)
+	if got := stepSorted(timerSecondsChoices, 100*60, 1); got != 120*60 {
+		t.Errorf("stepSorted(100 分, +1) = %d，預期 7200", got)
 	}
-	if got := stepSorted(timerMinutesChoices, 100, -1); got != 90 {
-		t.Errorf("stepSorted(100, -1) = %d，預期 90", got)
+	if got := stepSorted(timerSecondsChoices, 100*60, -1); got != 90*60 {
+		t.Errorf("stepSorted(100 分, -1) = %d，預期 5400", got)
 	}
-	if got := formatMinutes(150); got != "2 小時 30 分" {
-		t.Errorf("formatMinutes(150) = %q", got)
+	if got := stepSorted(timerSecondsChoices, 5*60, -1); got != 60 {
+		t.Errorf("5 分鐘的前一個 = %d，預期 60", got)
+	}
+	if got := stepSorted(timerSecondsChoices, 10, -1); got != 10 {
+		t.Errorf("10 秒的前一個 = %d，預期停在 10", got)
+	}
+}
+
+func TestFormatTimer(t *testing.T) {
+	for sec, want := range map[int]string{10: "10 秒", 30: "30 秒", 60: "1 分鐘", 90: "1 分 30 秒", 300: "5 分鐘",
+		7200: "2 小時", 9000: "2 小時 30 分", 3610: "1 小時 0 分 10 秒", 3910: "1 小時 5 分 10 秒"} {
+		if got := formatTimer(sec); got != want {
+			t.Errorf("formatTimer(%d) = %q，預期 %q", sec, got, want)
+		}
+	}
+}
+
+func TestLegacyTimerMinutes(t *testing.T) {
+	var c Config
+	if err := json.Unmarshal([]byte(`{"timerMinutes": 90}`), &c); err != nil {
+		t.Fatal(err)
+	}
+	c.normalize()
+	if c.TimerSeconds != 5400 || c.LegacyTimerMinutes != 0 {
+		t.Errorf("舊設定檔 90 分鐘 → %d 秒（舊欄位 %d）", c.TimerSeconds, c.LegacyTimerMinutes)
+	}
+}
+
+func TestBreath(t *testing.T) {
+	if f := breath(0); math.Abs(f-1) > 1e-9 {
+		t.Errorf("breath(0) = %v，預期 1", f)
+	}
+	if f := breath(breathPeriod / 2); math.Abs(f-breathMin) > 1e-9 {
+		t.Errorf("breath(半個週期) = %v，預期 %v", f, breathMin)
+	}
+	if got := dimmed(ui.ColorText, 1); got != ui.ColorText {
+		t.Errorf("dimmed(f=1) = %v，預期原色", got)
+	}
+	if got := dimmed(ui.ColorText, 0); got != ui.ColorBackground {
+		t.Errorf("dimmed(f=0) = %v，預期背景色", got)
 	}
 }
