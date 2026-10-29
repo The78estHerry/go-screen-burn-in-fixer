@@ -8,10 +8,12 @@ package app
 //
 //	主程式 → 子程式：pos <節目時間 ns> <0|1 暫停>   Burn-In 播放位置
 //	               step <階> <已顯示 ns>          檢查畫面目前的階
+//	               gray <0–255>                  灰階全畫面切換成手動後的灰階
 //	               saver                         切換成螢幕保護畫面
 //	               blank                         顯示全黑（關機 / 睡眠倒數中）
 //	               quit                          結束
 //	子程式 → 主程式：esc、pause、next、prev        使用者在子程式的螢幕上按的鍵
+//	               gray <0–255>                  在子程式的螢幕上用右鍵拖曳調整的灰階
 //	               marks <x,y;x,y;…>            檢查畫面的標記（整份）
 //
 // 計時、換階與後續動作都由主程式決定，子程式只負責顯示並回報按鍵，所以所有螢幕一起前進、一起結束。
@@ -123,7 +125,9 @@ func (a *App) childArgs(mode Mode, monitor int, base program.Program, timer time
 				"-seed", strconv.FormatUint(a.seed, 10))
 		}
 	case ModeCheck:
-		args = append(args, "-check", a.cfg.CheckSpec(), "-gray-levels", strconv.Itoa(a.cfg.GrayLevels))
+		args = append(args, "-check", a.cfg.CheckSpec(), "-gray-levels", strconv.Itoa(a.cfg.GrayLevels),
+			"-gray-min", strconv.Itoa(a.cfg.GrayMin), "-gray-max", strconv.Itoa(a.cfg.GrayMax),
+			"-gray-field-steps", strconv.Itoa(a.cfg.GrayFieldN))
 	}
 	return args
 }

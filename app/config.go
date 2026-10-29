@@ -75,8 +75,11 @@ type Config struct {
 	SaverExit    SaverExit       `json:"saverExit"`
 
 	CheckItems   []CheckItemConfig `json:"checkItems"`
-	GrayLevels   int               `json:"grayLevels"`   // 灰階分階的階數
-	MonitorMarks map[string][]Mark `json:"monitorMarks"` // 每個螢幕的標記，以 monitor.key 區分
+	GrayLevels   int               `json:"grayLevels"`     // 灰階分階的階數
+	GrayMin      int               `json:"grayMin"`        // 灰階全畫面的最暗值（0–255）
+	GrayMax      int               `json:"grayMax"`        // 灰階全畫面的最亮值（0–255）
+	GrayFieldN   int               `json:"grayFieldSteps"` // 灰階全畫面手動時的階數
+	MonitorMarks map[string][]Mark `json:"monitorMarks"`   // 每個螢幕的標記，以 monitor.key 區分
 
 	// 舊版設定檔的欄位（單一螢幕）：讀取後轉換成 Monitors、MonitorMarks。
 	LegacyMonitor int    `json:"monitor,omitempty"`
@@ -111,6 +114,9 @@ func DefaultConfig() Config {
 		Screensaver:  screensaver.All()[0].Name(),
 		SaverExit:    SaverExitMenu,
 		GrayLevels:   checks.DefaultGrayLevels,
+		GrayMin:      checks.DefaultGrayMin,
+		GrayMax:      checks.DefaultGrayMax,
+		GrayFieldN:   checks.DefaultGrayFieldSteps,
 		InfoBar:      5,
 	}
 	for _, p := range patterns.All() {
@@ -175,6 +181,7 @@ func (c *Config) normalize() {
 		c.Mode = def.Mode
 	}
 	c.GrayLevels = checks.ClampGrayLevels(c.GrayLevels)
+	c.GrayMin, c.GrayMax, c.GrayFieldN = checks.ClampGrayField(c.GrayMin, c.GrayMax, c.GrayFieldN)
 	if !contains(infoBarChoices, c.InfoBar) {
 		c.InfoBar = def.InfoBar
 	}
@@ -275,13 +282,21 @@ type CheckStep struct {
 	Items   int // 項目總數
 }
 
-// CheckSequence 依勾選的項目展開成依序顯示的每一階，並套用灰階分階的階數。
-func (c Config) CheckSequence() []CheckStep {
-	if g, ok := checks.Get("gray-steps"); ok {
-		if gs, ok := g.(*checks.GraySteps); ok {
-			gs.Levels = c.GrayLevels
+// applyChecks 把灰階分階的階數與灰階全畫面的範圍套用到檢查項目。
+func (c Config) applyChecks() {
+	for _, ck := range checks.All() {
+		switch ck := ck.(type) {
+		case *checks.GraySteps:
+			ck.Levels = c.GrayLevels
+		case *checks.GrayField:
+			ck.Min, ck.Max, ck.N = checks.ClampGrayField(c.GrayMin, c.GrayMax, c.GrayFieldN)
 		}
 	}
+}
+
+// CheckSequence 依勾選的項目展開成依序顯示的每一階，並套用灰階分階與灰階全畫面的設定。
+func (c Config) CheckSequence() []CheckStep {
+	c.applyChecks()
 	var items []CheckItemConfig
 	for _, it := range c.CheckItems {
 		if _, ok := checks.Get(it.Check); ok && it.Enabled {

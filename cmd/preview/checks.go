@@ -31,7 +31,12 @@ var grayStepsPreviewLevels = []int{16, 32, 64, 256}
 
 func writeCheckSheet(c checks.Check, out string) error {
 	var steps []sheetTile
-	if _, ok := c.(*checks.GraySteps); ok {
+	if gf, ok := c.(*checks.GrayField); ok {
+		// 灰階全畫面：預設範圍手動時的每一階。
+		for _, v := range gf.Levels() {
+			steps = append(steps, sheetTile{checks.GrayLabel(v), func(dst *ebiten.Image) { gf.Value = v; gf.Draw(dst, 0, 0) }})
+		}
+	} else if _, ok := c.(*checks.GraySteps); ok {
 		for _, n := range grayStepsPreviewLevels {
 			g := checks.NewGraySteps(n)
 			steps = append(steps, sheetTile{g.Steps()[0], func(dst *ebiten.Image) { g.Draw(dst, 0, 0) }})

@@ -27,17 +27,58 @@ type checkScene struct {
 	lastCursor  [2]int
 	cursorUntil time.Time
 	marksHidden bool
+	gray        grayState
+}
+
+// grayState 是灰階全畫面（checks.GrayField）目前的狀態。
+type grayState struct {
+	value    int  // 目前顯示的灰階
+	manual   bool // 手動：設定為手動，或用右鍵拖曳過（自動漸進就此停止）
+	dragging bool
+	dragX    int // 開始拖曳時的游標 x
+	dragFrom int // 開始拖曳時的灰階
 }
 
 func newCheckScene(seq []CheckStep, infoSetting int) *checkScene {
 	cx, cy := ebiten.CursorPosition()
-	return &checkScene{seq: seq, stepStart: time.Now(), info: newInfoBar(infoSetting), lastCursor: [2]int{cx, cy}}
+	s := &checkScene{seq: seq, stepStart: time.Now(), info: newInfoBar(infoSetting), lastCursor: [2]int{cx, cy}}
+	s.resetGray(false)
+	return s
+}
+
+// grayField 回傳目前的項目是否為灰階全畫面。
+func (s *checkScene) grayField() (*checks.GrayField, bool) {
+	g, ok := s.seq[s.idx].Check.(*checks.GrayField)
+	return g, ok
+}
+
+// resetGray 在進入一個項目時重設灰階狀態：自動從最暗開始漸進；手動停在第一階（atEnd 時停在最後一階）。
+func (s *checkScene) resetGray(atEnd bool) {
+	g, ok := s.grayField()
+	if !ok {
+		return
+	}
+	s.gray = grayState{manual: s.seq[s.idx].Seconds == Manual, value: g.Min}
+	if ls := g.Levels(); s.gray.manual && atEnd {
+		s.gray.value = ls[len(ls)-1]
+	}
+}
+
+// setGray 設定灰階並切換成手動（右鍵拖曳、多螢幕同步）。
+func (s *checkScene) setGray(v int) {
+	if !s.gray.manual || s.gray.value != v {
+		s.info.flash()
+	}
+	s.gray.manual, s.gray.value = true, v
 }
 
 // stepDuration 回傳目前這一階自動前進前的顯示時間；手動時回傳 0。
 func (s *checkScene) stepDuration() time.Duration {
 	st := s.seq[s.idx]
 	if st.Seconds == Manual {
+		return 0
+	}
+	if _, ok := s.grayField(); ok && s.gray.manual {
 		return 0
 	}
 	d := time.Duration(st.Seconds) * time.Second
@@ -51,6 +92,7 @@ func (s *checkScene) goTo(idx int) {
 	s.idx = idx
 	s.stepStart = time.Now()
 	s.info.flash()
+	s.resetGray(false)
 }
 
 // finish 結束檢查（完成或取消）：儲存標記後回到選單；帶參數執行時直接結束。
@@ -100,6 +142,9 @@ func (s *checkScene) Update(a *App) error {
 		s.toggleMark(a, cx, cy)
 		s.cursorUntil = time.Now().Add(crosshairDuration)
 	}
+	if g, ok := s.grayField(); ok {
+		s.updateGray(a, g, cx)
+	}
 
 	// 多螢幕時只由主程式計時，子程式跟著主程式換階。
 	if d := s.stepDuration(); a.up == nil && d > 0 && time.Since(s.stepStart) >= d {
@@ -118,12 +163,33 @@ func (s *checkScene) command(a *App, cmd string) error {
 	case "esc":
 		return s.finish(a, true)
 	case "next":
+		if g, ok := s.grayField(); ok && s.gray.manual {
+			if v, ok := nextLevel(g.Levels(), s.gray.value, 1); ok {
+				s.gray.value = v
+				s.stepStart = time.Now()
+				s.info.flash()
+				break
+			}
+		}
 		if s.idx+1 >= len(s.seq) {
 			return s.finish(a, false)
 		}
 		s.goTo(s.idx + 1)
 	case "prev":
-		s.goTo(max(s.idx-1, 0))
+		if g, ok := s.grayField(); ok && s.gray.manual {
+			if v, ok := nextLevel(g.Levels(), s.gray.value, -1); ok {
+				s.gray.value = v
+				s.stepStart = time.Now()
+				s.info.flash()
+				break
+			}
+		}
+		if s.idx > 0 {
+			s.goTo(s.idx - 1)
+			s.resetGray(true) // 從後面回到灰階全畫面（手動）時停在最後一階
+		} else {
+			s.goTo(0)
+		}
 	default:
 		return nil
 	}
@@ -131,12 +197,28 @@ func (s *checkScene) command(a *App, cmd string) error {
 	return nil
 }
 
-// sync 把目前的階與已顯示的時間送給所有子程式（殘影測試依時間切換畫面）。
+// sync 把目前的階與已顯示的時間送給所有子程式（殘影測試依時間切換畫面）；
+// 灰階全畫面切換成手動後，另外送出目前的灰階。
 func (s *checkScene) sync(a *App) {
 	a.broadcast("step %d %d", s.idx, int64(time.Since(s.stepStart)))
+	if _, ok := s.grayField(); ok && s.gray.manual {
+		a.broadcast("gray %d", s.gray.value)
+	}
 }
 
 func (s *checkScene) remote(a *App, cmd string, args []string) error {
+	if cmd == "gray" && len(args) == 1 {
+		v, err := strconv.Atoi(args[0])
+		g, ok := s.grayField()
+		if err != nil || !ok || s.gray.dragging { // 自己正在拖曳時以自己的為準
+			return nil
+		}
+		s.setGray(min(max(v, g.Min), g.Max))
+		if a.up == nil { // 主程式：子程式拖曳了灰階，同步到其他螢幕
+			s.sync(a)
+		}
+		return nil
+	}
 	if a.up == nil { // 主程式：子程式回報的按鍵
 		return s.command(a, cmd)
 	}
@@ -152,6 +234,65 @@ func (s *checkScene) remote(a *App, cmd string, args []string) error {
 		s.stepStart = time.Now().Add(-time.Duration(el))
 	}
 	return nil
+}
+
+// updateGray 更新灰階全畫面：自動時依經過時間漸進；按住右鍵左右拖曳時調整灰階並切換成手動
+// （拖曳整個螢幕寬度等於從最暗到最亮）。
+func (s *checkScene) updateGray(a *App, g *checks.GrayField, cx int) {
+	if !s.gray.manual {
+		if d := time.Duration(s.seq[s.idx].Seconds) * time.Second; d > 0 {
+			s.gray.value = g.At(float64(time.Since(s.stepStart)) / float64(d))
+		}
+	}
+	switch {
+	case inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonRight):
+		s.gray.dragging, s.gray.dragX, s.gray.dragFrom = true, cx, s.gray.value
+	case s.gray.dragging && !ebiten.IsMouseButtonPressed(ebiten.MouseButtonRight):
+		s.gray.dragging = false
+	case s.gray.dragging && cx != s.gray.dragX:
+		w := max(a.screenW, 1)
+		v := s.gray.dragFrom + int(math.Round(float64(cx-s.gray.dragX)/float64(w)*float64(g.Max-g.Min)))
+		v = min(max(v, g.Min), g.Max)
+		if !s.gray.manual || v != s.gray.value {
+			s.setGray(v)
+			if a.up != nil {
+				a.up.send("gray %d", v)
+			} else {
+				s.sync(a)
+			}
+		}
+	}
+}
+
+// nextLevel 回傳 levels（遞增）中比 v 大（dir > 0）或比 v 小（dir < 0）的下一階；沒有時回傳 false。
+func nextLevel(levels []int, v, dir int) (int, bool) {
+	if dir > 0 {
+		for _, l := range levels {
+			if l > v {
+				return l, true
+			}
+		}
+		return 0, false
+	}
+	for i := len(levels) - 1; i >= 0; i-- {
+		if levels[i] < v {
+			return levels[i], true
+		}
+	}
+	return 0, false
+}
+
+// grayPosition 說明 v 是第幾階，例如「第 4/7 階」；拖曳到兩階之間時為「第 3–4/7 階之間」。
+func grayPosition(levels []int, v int) string {
+	for i, l := range levels {
+		if l == v {
+			return fmt.Sprintf("第 %d/%d 階", i+1, len(levels))
+		}
+		if l > v && i > 0 {
+			return fmt.Sprintf("第 %d–%d/%d 階之間", i, i+1, len(levels))
+		}
+	}
+	return fmt.Sprintf("第 %d/%d 階", len(levels), len(levels))
 }
 
 // toggleMark 在游標位置新增標記；點在既有標記上則移除它。
@@ -175,6 +316,10 @@ func markRadius(screenH int) float64 {
 func (s *checkScene) Draw(a *App, screen *ebiten.Image) {
 	st := s.seq[s.idx]
 	t := time.Since(s.stepStart).Seconds()
+	g, isGray := s.grayField()
+	if isGray {
+		g.Value = s.gray.value
+	}
 	st.Check.Draw(screen, st.Step, t)
 
 	h := screen.Bounds().Dy()
@@ -192,6 +337,13 @@ func (s *checkScene) Draw(a *App, screen *ebiten.Image) {
 
 	steps := st.Check.Steps()
 	line1 := fmt.Sprintf("%s（項目 %d/%d，第 %d/%d 階）", steps[st.Step], st.Index+1, st.Items, st.Step+1, len(steps))
+	if isGray {
+		pos := fmt.Sprintf("%d–%d 漸進", g.Min, g.Max)
+		if s.gray.manual {
+			pos = grayPosition(g.Levels(), s.gray.value)
+		}
+		line1 = fmt.Sprintf("%s　項目 %d/%d，%s", checks.GrayLabel(s.gray.value), st.Index+1, st.Items, pos)
+	}
 	if d := s.stepDuration(); d > 0 {
 		line1 += "　剩餘 " + formatDuration(d-time.Since(s.stepStart))
 	} else {
@@ -201,9 +353,12 @@ func (s *checkScene) Draw(a *App, screen *ebiten.Image) {
 	if sv, ok := st.Check.(checks.Statuser); ok {
 		lines = append(lines, sv.Status(st.Step, t))
 	}
+	keys := "Enter／空白鍵 下一階　← 上一階　Esc 取消　點一下 標記／取消標記　C 清除標記　M 隱藏標記　H 資訊列　按住 S 顯示"
+	if isGray {
+		keys = "Enter／空白鍵 下一階　← 上一階　右鍵拖曳 調整灰階（切換成手動）　Esc 取消　點一下 標記　C 清除標記　M 隱藏標記　H 資訊列"
+	}
 	lines = append(lines, st.Check.Hint(),
-		fmt.Sprintf("座標 (%d, %d)　標記 %d 個", s.lastCursor[0], s.lastCursor[1], len(a.marks())),
-		"Enter／空白鍵 下一階　← 上一階　Esc 取消　點一下 標記／取消標記　C 清除標記　M 隱藏標記　H 資訊列　按住 S 顯示")
+		fmt.Sprintf("座標 (%d, %d)　標記 %d 個", s.lastCursor[0], s.lastCursor[1], len(a.marks())), keys)
 	s.info.draw(screen, lines...)
 }
 

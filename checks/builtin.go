@@ -32,9 +32,17 @@ var GrayLevelChoices = []int{8, 16, 32, 64, 128, 256}
 // RetentionPatternSeconds 是殘影測試中高對比格紋的顯示時間，之後切換成灰色觀察殘影。
 const RetentionPatternSeconds = 10
 
+// 灰階全畫面的範圍（8 位元訊號值 0–255）與手動時的階數。預設 13–191 約為 5–75%。
+const (
+	DefaultGrayMin        = 13
+	DefaultGrayMax        = 191
+	DefaultGrayFieldSteps = 7
+	MinGrayFieldSteps     = 4
+	MaxGrayFieldSteps     = 15
+)
+
 // 百分比都是 8 位元訊號值的比例（25% = 64/255），不是亮度。
 var (
-	grayLevels      = []int{5, 10, 18, 25, 35, 50, 75}
 	colorLevels     = []int{25, 50, 100}
 	nearBlackLevels = []int{1, 2, 3, 5}
 )
@@ -44,20 +52,7 @@ func level(percent int) uint8 {
 }
 
 func init() {
-	// 灰階全畫面
-	var graySteps []string
-	var grays []color.Color
-	for _, p := range grayLevels {
-		graySteps = append(graySteps, fmt.Sprintf("灰階 %d%%", p))
-		v := level(p)
-		grays = append(grays, color.RGBA{v, v, v, 0xff})
-	}
-	Register(&fillCheck{
-		name:  "gray-field",
-		desc:  "灰階全畫面 5–75%",
-		hint:  "找出比周圍暗（或亮）的影子，例如工作列、圖示、視窗邊框、遊戲 HUD。烙印在 18–35% 最容易看出來。",
-		steps: graySteps, colors: grays,
-	})
+	Register(&GrayField{Min: DefaultGrayMin, Max: DefaultGrayMax, N: DefaultGrayFieldSteps, Value: DefaultGrayMin})
 
 	Register(NewGraySteps(DefaultGrayLevels))
 
@@ -133,6 +128,59 @@ func (c *fillCheck) Steps() []string     { return c.steps }
 
 func (c *fillCheck) Draw(dst *ebiten.Image, step int, _ float64) {
 	dst.Fill(c.colors[step])
+}
+
+// GrayField：全畫面單一灰階，在 Min–Max 之間變化。自動時連續漸進（秒數是整個項目的時間），
+// 手動時平均分成 N 階；也可以用滑鼠右鍵拖曳調整。目前顯示的值（Value）由檢查畫面決定。
+type GrayField struct {
+	Min, Max, N int
+	Value       int
+}
+
+// ClampGrayField 把範圍限制在 0–255（min 大於 max 時交換）、階數限制在 MinGrayFieldSteps–MaxGrayFieldSteps。
+func ClampGrayField(lo, hi, n int) (int, int, int) {
+	lo, hi = min(max(lo, 0), 255), min(max(hi, 0), 255)
+	if lo > hi {
+		lo, hi = hi, lo
+	}
+	return lo, hi, min(max(n, MinGrayFieldSteps), MaxGrayFieldSteps)
+}
+
+// Levels 回傳手動時的每一階：Min 到 Max 平均分成 N 階，但不超過範圍內的灰階數
+// （例如 3–4 只有 2 階，Min = Max 只有 1 階）。
+func (g *GrayField) Levels() []int {
+	k := min(g.N, g.Max-g.Min+1)
+	if k <= 1 {
+		return []int{g.Min}
+	}
+	ls := make([]int, k)
+	for i := range ls {
+		ls[i] = int(math.Round(float64(g.Min) + float64(g.Max-g.Min)*float64(i)/float64(k-1)))
+	}
+	return ls
+}
+
+// At 回傳自動漸進到 frac（0–1）時的灰階。
+func (g *GrayField) At(frac float64) int {
+	frac = min(max(frac, 0), 1)
+	return int(math.Round(float64(g.Min) + float64(g.Max-g.Min)*frac))
+}
+
+// GrayLabel 回傳灰階的說明，例如「灰階 128（50.2%）」；百分比是訊號值的比例。
+func GrayLabel(v int) string {
+	return fmt.Sprintf("灰階 %d（%.1f%%）", v, float64(v)*100/255)
+}
+
+func (*GrayField) Name() string        { return "gray-field" }
+func (*GrayField) Description() string { return "灰階全畫面（最暗到最亮漸進）" }
+func (*GrayField) Hint() string {
+	return "找出比周圍暗（或亮）的影子，例如工作列、圖示、視窗邊框、遊戲 HUD。烙印在 18–35% 最容易看出來。按住右鍵左右拖曳可調整灰階。"
+}
+func (*GrayField) Steps() []string { return []string{"灰階全畫面"} }
+
+func (g *GrayField) Draw(dst *ebiten.Image, _ int, _ float64) {
+	v := uint8(min(max(g.Value, 0), 255))
+	dst.Fill(color.RGBA{v, v, v, 0xff})
 }
 
 // GraySteps：畫面由左到右分成 Levels 條灰色色帶（黑到白等距），用來測試螢幕能分辨的灰階數。

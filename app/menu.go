@@ -454,15 +454,41 @@ func infoBarRow(cfg *Config, y float64, disabled bool) item {
 
 // ── 檢查畫面 ─────────────────────────────────────────────
 
-// checkPreview 在預覽框輪流顯示檢查項目的每一階（殘影測試則依時間顯示格紋與灰色）。
+// checkPreview 在預覽框輪流顯示檢查項目的每一階（殘影測試則依時間顯示格紋與灰色；
+// 灰階全畫面則每 4 秒從最暗漸進到最亮一次）。
 func checkPreview(ck checks.Check, cfg *Config) func(*ebiten.Image, int) {
 	return func(dst *ebiten.Image, frame int) {
-		if gs, ok := ck.(*checks.GraySteps); ok {
-			gs.Levels = cfg.GrayLevels
-		}
+		cfg.applyChecks()
 		n := len(ck.Steps())
 		t := float64(frame) / 60
+		if g, ok := ck.(*checks.GrayField); ok {
+			g.Value = g.At(mod(t, grayPreviewSeconds) / grayPreviewSeconds)
+		}
 		ck.Draw(dst, (frame/90)%n, mod(t, checks.RetentionPatternSeconds+4))
+	}
+}
+
+// grayPreviewSeconds 是預覽框中灰階全畫面從最暗漸進到最亮的秒數。
+const grayPreviewSeconds = 4
+
+// grayValuePreview 在預覽框顯示單一灰階（選到最暗、最亮欄位時）。
+func grayValuePreview(v func() int) func(*ebiten.Image, int) {
+	return func(dst *ebiten.Image, _ int) {
+		g := uint8(v())
+		dst.Fill(color.RGBA{g, g, g, 0xff})
+	}
+}
+
+// grayLevelsPreview 在預覽框輪流顯示手動時的每一階（選到階數欄位時）。
+func grayLevelsPreview(cfg *Config) func(*ebiten.Image, int) {
+	return func(dst *ebiten.Image, frame int) {
+		cfg.applyChecks()
+		if ck, ok := checks.Get("gray-field"); ok {
+			g := ck.(*checks.GrayField)
+			ls := g.Levels()
+			g.Value = ls[(frame/45)%len(ls)]
+			g.Draw(dst, 0, 0)
+		}
 	}
 }
 
@@ -520,8 +546,11 @@ func (m *menuScene) checkItems(cfg *Config) []item {
 			m.defaultView = preview
 		}
 		desc := func() string { return shortDesc(ck.Description()) }
-		if _, ok := ck.(*checks.GraySteps); ok {
+		switch ck.(type) {
+		case *checks.GraySteps:
 			desc = func() string { return fmt.Sprintf("灰階分階 %d 階", cfg.GrayLevels) }
+		case *checks.GrayField:
+			desc = func() string { return fmt.Sprintf("灰階 %d–%d 漸進", cfg.GrayMin, cfg.GrayMax) }
 		}
 		items = append(items, listRow(i, it.Check, desc, &it.Enabled,
 			func() string { return checkSecondsLabel(it.Seconds, len(ck.Steps())) },
@@ -576,15 +605,74 @@ func (m *menuScene) checkItems(cfg *Config) []item {
 		items = append(items, infoBarRow(cfg, y, false))
 	}
 
+	items = append(items, m.grayFieldItems(cfg)...)
+
 	// 標記
 	{
-		y := rowBottom2
+		y := rowBottom3
 		items = append(items, button(ui.Rect{X: colValue + 170, Y: y - 6, W: 150, H: 32}, "清除全部標記", false, func() { cfg.ClearMarks() }, cfg.MarkCount() == 0))
 		items[len(items)-1].draw = wrapDraw(items[len(items)-1].draw, func(p *painter) {
 			p.text("標記", colLabel, y, 17, ui.ColorDim, ui.Left)
 			p.text(fmt.Sprintf("已有 %d 個", cfg.MarkCount()), colValue, y, 17, ui.ColorText, ui.Left)
 		})
 	}
+	return items
+}
+
+// grayFieldItems：灰階全畫面的最暗、最亮與手動階數，各自可以 ◀▶ 調整或直接輸入。
+func (m *menuScene) grayFieldItems(cfg *Config) []item {
+	y := rowBottom2
+	field := func(key, label string, x, w float64, get func() int, set func(int), lo, hi int,
+		preview func(*ebiten.Image, int)) item {
+		apply := func(v int) {
+			set(v)
+			cfg.GrayMin, cfg.GrayMax, cfg.GrayFieldN = checks.ClampGrayField(cfg.GrayMin, cfg.GrayMax, cfg.GrayFieldN)
+		}
+		dec := func() { m.commitEdit(); apply(max(get()-1, lo)) }
+		inc := func() { m.commitEdit(); apply(min(get()+1, hi)) }
+		value := func() string {
+			if m.editKey == key {
+				return m.editing + "▏"
+			}
+			return strconv.Itoa(get())
+		}
+		lw, _ := ui.Measure(label, 15)
+		clicks, d := selector(x+lw+8, y, w, value, dec, inc, false)
+		return item{
+			row: ui.Rect{X: x - 8, Y: y - 6, W: lw + w + 22, H: 34}, left: dec, right: inc, clicks: clicks, preview: preview,
+			edit: &numEdit{
+				key:    key,
+				accept: func(buf string, r rune) bool { return r >= '0' && r <= '9' && len(buf) < 3 },
+				apply: func(buf string) {
+					if n, err := strconv.Atoi(buf); err == nil {
+						apply(min(max(n, lo), hi))
+					}
+				},
+				hint: fmt.Sprintf("灰階全畫面的%s可直接輸入 %d–%d；Enter 確定", label, lo, hi),
+			},
+			draw: func(p *painter, _, _ bool) {
+				p.text(label, x, y+2, 15, ui.ColorDim, ui.Left)
+				d(p)
+			},
+		}
+	}
+	// 調整最暗超過最亮時，最亮跟著推上去（反之亦然），不會互換。
+	setMin := func(v int) { cfg.GrayMin, cfg.GrayMax = v, max(cfg.GrayMax, v) }
+	setMax := func(v int) { cfg.GrayMax, cfg.GrayMin = v, min(cfg.GrayMin, v) }
+	items := []item{
+		field("gmin", "最暗", colValue, 96, func() int { return cfg.GrayMin }, setMin, 0, 255,
+			grayValuePreview(func() int { return cfg.GrayMin })),
+		field("gmax", "最亮", colValue+150, 96, func() int { return cfg.GrayMax }, setMax, 0, 255,
+			grayValuePreview(func() int { return cfg.GrayMax })),
+		field("gn", "手動", colValue+300, 86, func() int { return cfg.GrayFieldN }, func(v int) { cfg.GrayFieldN = v },
+			checks.MinGrayFieldSteps, checks.MaxGrayFieldSteps, grayLevelsPreview(cfg)),
+	}
+	items[0].draw = wrapDraw(items[0].draw, func(p *painter) {
+		p.text("灰階全畫面", colLabel, y, 17, ui.ColorDim, ui.Left)
+		g := checks.GrayField{Min: cfg.GrayMin, Max: cfg.GrayMax, N: cfg.GrayFieldN}
+		p.text(fmt.Sprintf("階（實際 %d 階）　%.1f%%–%.1f%%", len(g.Levels()), float64(cfg.GrayMin)*100/255, float64(cfg.GrayMax)*100/255),
+			colValue+300+40+86+8, y+3, 14, ui.ColorDim, ui.Left)
+	})
 	return items
 }
 
@@ -902,7 +990,7 @@ func (m *menuScene) Draw(a *App, screen *ebiten.Image) {
 	}
 	hint, hintColor := "↑↓ 選擇　←→ 調整　空白鍵 勾選", color.Color(ui.ColorBorder)
 	if cfg.Mode == ModeCheck {
-		hint = "檢查時：Enter／空白鍵 下一階　← 上一階　Esc 取消　點一下 標記"
+		hint = "檢查時：Enter／空白鍵 下一階　← 上一階　Esc 取消　點一下 標記　右鍵拖曳 調整灰階"
 	}
 	if e := items[focus].edit; e != nil && !items[focus].disabled {
 		hint, hintColor = e.hint, ui.ColorDim
@@ -915,9 +1003,15 @@ func (m *menuScene) Draw(a *App, screen *ebiten.Image) {
 func checkSummary(seq []CheckStep) string {
 	var total time.Duration
 	manual := 0
+	steps := 0
 	for _, st := range seq {
+		n := 1
+		if g, ok := st.Check.(*checks.GrayField); ok && st.Seconds == Manual {
+			n = len(g.Levels())
+		}
+		steps += n
 		if st.Seconds == Manual {
-			manual++
+			manual += n
 			continue
 		}
 		total += time.Duration(st.Seconds) * time.Second
@@ -925,7 +1019,7 @@ func checkSummary(seq []CheckStep) string {
 			total += checks.RetentionPatternSeconds * time.Second
 		}
 	}
-	s := fmt.Sprintf("共 %d 階，自動約 %s", len(seq), formatDuration(total))
+	s := fmt.Sprintf("共 %d 階，自動約 %s", steps, formatDuration(total))
 	if manual > 0 {
 		s += fmt.Sprintf("，手動 %d 階", manual)
 	}

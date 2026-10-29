@@ -2,6 +2,8 @@ package app
 
 import (
 	"encoding/json"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"gitea.littleherry.work/The78estWorld/go-screen-burn-in-fixer/checks"
@@ -48,6 +50,10 @@ func TestNormalizeConfig(t *testing.T) {
 	if c.GrayLevels != checks.MaxGrayLevels {
 		t.Errorf("GrayLevels = %d，預期 %d", c.GrayLevels, checks.MaxGrayLevels)
 	}
+	if c.GrayMin != 0 || c.GrayMax != 0 || c.GrayFieldN != checks.MinGrayFieldSteps {
+		// 直接 Unmarshal 到空的 Config（沒有預設值）：0–0、階數限制到最小值
+		t.Errorf("灰階全畫面 = %d–%d、%d 階", c.GrayMin, c.GrayMax, c.GrayFieldN)
+	}
 	if c.InfoBar != 5 {
 		t.Errorf("InfoBar = %d，預期回到預設 5", c.InfoBar)
 	}
@@ -67,6 +73,57 @@ func TestNormalizeConfig(t *testing.T) {
 		case "no-such":
 			t.Error("不存在的檢查項目應被移除")
 		}
+	}
+}
+
+func TestLoadConfigGrayField(t *testing.T) {
+	dir := t.TempDir()
+	load := func(js string) Config {
+		t.Helper()
+		path := filepath.Join(dir, "c.json")
+		if err := os.WriteFile(path, []byte(js), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		c, err := LoadConfig(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return c
+	}
+	// 舊版設定檔沒有灰階全畫面的欄位：使用預設值。
+	c := load(`{"mode": "check"}`)
+	if c.GrayMin != checks.DefaultGrayMin || c.GrayMax != checks.DefaultGrayMax || c.GrayFieldN != checks.DefaultGrayFieldSteps {
+		t.Errorf("預設值錯誤：%d–%d、%d 階", c.GrayMin, c.GrayMax, c.GrayFieldN)
+	}
+	// 最暗大於最亮時交換；超出範圍時限制。
+	c = load(`{"grayMin": 200, "grayMax": 20, "grayFieldSteps": 40}`)
+	if c.GrayMin != 20 || c.GrayMax != 200 || c.GrayFieldN != checks.MaxGrayFieldSteps {
+		t.Errorf("限制後：%d–%d、%d 階", c.GrayMin, c.GrayMax, c.GrayFieldN)
+	}
+	c = load(`{"grayMin": 0, "grayMax": 300}`)
+	if c.GrayMin != 0 || c.GrayMax != 255 {
+		t.Errorf("限制後：%d–%d", c.GrayMin, c.GrayMax)
+	}
+}
+
+func TestGrayPosition(t *testing.T) {
+	ls := []int{13, 43, 72}
+	for _, tc := range []struct {
+		v    int
+		want string
+	}{{13, "第 1/3 階"}, {43, "第 2/3 階"}, {50, "第 2–3/3 階之間"}, {72, "第 3/3 階"}} {
+		if got := grayPosition(ls, tc.v); got != tc.want {
+			t.Errorf("grayPosition(%d) = %q，預期 %q", tc.v, got, tc.want)
+		}
+	}
+	if v, ok := nextLevel(ls, 50, 1); !ok || v != 72 {
+		t.Errorf("50 的下一階 = %d, %v", v, ok)
+	}
+	if v, ok := nextLevel(ls, 50, -1); !ok || v != 43 {
+		t.Errorf("50 的上一階 = %d, %v", v, ok)
+	}
+	if _, ok := nextLevel(ls, 72, 1); ok {
+		t.Error("最後一階之後應該沒有下一階")
 	}
 }
 

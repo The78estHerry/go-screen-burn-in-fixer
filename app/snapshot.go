@@ -67,6 +67,10 @@ func (g *snapshotGame) Update() error {
 	check.lastCursor = [2]int{560, 400}
 	check.cursorUntil = time.Now().Add(time.Minute)
 
+	// 灰階全畫面：右鍵拖曳到兩階之間（切換成手動）。
+	grayCheck := newCheckScene(checkCfg.CheckSequence()[0:1], InfoAlways)
+	grayCheck.setGray(50)
+
 	// 多螢幕的選單：加上兩個假的螢幕示範勾選框，並選擇洗牌（只畫選單，不會真的播放）。
 	multiMons := append(append([]monitor(nil), a.monitors...),
 		monitor{short: "2：DELL U2720Q 3840×2160", tiny: "2：3840×2160", key: "fake-2"},
@@ -91,6 +95,7 @@ func (g *snapshotGame) Update() error {
 		{"menu-screensaver", newMenuScene(a), saverCfg, nil},
 		{"play-hud", play, a.cfg, nil},
 		{"check-hud", check, checkCfg, nil},
+		{"check-hud-gray", grayCheck, checkCfg, nil},
 		{"countdown", newCountdownScene(actions.Shutdown, 60*time.Second), a.cfg, nil},
 		{"screensaver", newSaverScene("drift-clock"), a.cfg, nil},
 	}
