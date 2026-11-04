@@ -4,11 +4,12 @@
 
 ## 目前進度
 
-最新版本 **v0.3.1**，Release 附 Windows / macOS（Apple Silicon、Intel）/ Linux x64 四個檔案。
+最新版本 **v0.3.2**，Release 附 Windows / macOS（Apple Silicon、Intel）/ Linux x64 四個檔案。
 
 **0.3.2 起主要放在 GitHub**（公開）：https://github.com/The78estHerry/go-screen-burn-in-fixer ；Gitea（私人）同步一份。v0.1.0～v0.3.1 的 Release 只在 Gitea。
 
-- 2026-11-04：main 與 v0.1.0～v0.3.1 全部 tag 已推上 GitHub。**下一步**：`build.py` 產生 0.3.2 → 使用者實測 → tag v0.3.2、兩邊建 Release（見 RELEASING.md）。
+- 2026-11-04：main 與全部 tag 推上 GitHub；使用者實測 0.3.2 通過後發佈 **v0.3.2**（GitHub Release id 433618822、Gitea id 19），兩邊下載比對 SHA-256 一致。
+- **下一步：0.4.0 英文介面**（使用者要求）：程式內可切換英文／中文，預設英文；切換放在選單右上角「English | 中文」。
 
 | 版本 | 內容 |
 |---|---|
@@ -16,6 +17,7 @@
 | v0.2.0 | 多螢幕同時播放、洗牌播放、播放時間直接輸入、EDID 擴充區塊、exe 圖示與版本資訊、選單反白修正 |
 | v0.2.1 | macOS 與 Linux 版本、播放結束後選單回到原本的螢幕 |
 | v0.3.0 | 灰階全畫面：可設定最暗／最亮／階數、右鍵拖曳調整灰階、資訊列顯示數值與百分比 |
+| v0.3.2 | 第一次在 GitHub 發佈：module 路徑、三語 README 與圖示、著作權人 The78ester、GitHub Sponsors；功能同 v0.3.1 |
 | v0.3.1 | 播放時間可選 10 秒–1 分鐘並可輸入秒數（`10s`、`3m`、`3h`）、倒數與提示文字呼吸效果、選單提示自動換行 |
 
 功能都已實作，自動測試（`go vet`、`go test`）與能在單一螢幕上做的流程測試都通過。**目前沒有進行中、做到一半的工作。** **Windows 的實機確認已全部完成**，只剩 macOS 與 Ubuntu。

@@ -17,7 +17,7 @@
    git push origin v0.3.2
    git push github v0.3.2
    ```
-7. 兩邊都建 Release，標題只寫版本號（例如 `v0.3.2`），說明相同：中文為主，英文、日文放在 `<details>` 折疊區塊。有快速閃爍畫面的警告、macOS／Linux 沒有實機測過時要寫。
+7. 兩邊都建 Release（`python tools/release/publish.py v<版本> <說明檔>`：建立 Release、上傳附件、下載回來比對 SHA-256，第 8、9 步也一起做完），標題只寫版本號（例如 `v0.3.2`），說明相同：中文為主，英文、日文放在 `<details>` 折疊區塊。有快速閃爍畫面的警告、macOS／Linux 沒有實機測過時要寫。
 8. 上傳 `dist/release/*` 當作附件。**不要上傳原始碼壓縮檔**，兩邊都會自動附上。
 9. 兩邊都下載回來比對 SHA-256。Gitea 是私人 repo，下載要帶 token，否則拿到的是登入頁。
 10. 更新 STATUS.md 的版本表。
@@ -38,4 +38,4 @@ token 一律用 `git credential fill` 取得，不要印出來、不要寫進檔
 | 版本 | 日期 | Release 位置 | 內容 |
 |---|---|---|---|
 | 0.1.0～0.3.1 | 2026-10-28～29 | Gitea | 見 STATUS.md |
-| 0.3.2 | — | GitHub、Gitea | 第一次在 GitHub 發佈：module 路徑改成 GitHub、README 加英文／日文版與圖示、著作權人改為 The78ester、啟用 GitHub Sponsors。功能和 0.3.1 相同 |
+| 0.3.2 | 2026-11-04 | GitHub（id 433618822）、Gitea（id 19） | 第一次在 GitHub 發佈：module 路徑改成 GitHub、README 加英文／日文版與圖示、著作權人改為 The78ester、啟用 GitHub Sponsors。功能和 0.3.1 相同 |
