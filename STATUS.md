@@ -4,8 +4,9 @@
 
 ## 目前進度
 
-最新版本 **v0.3.1**，Release 附 Windows / macOS（Apple Silicon、Intel）/ Linux x64 四個檔案：
-https://gitea.littleherry.work/The78estWorld/go-screen-burn-in-fixer/releases
+最新版本 **v0.3.1**，Release 附 Windows / macOS（Apple Silicon、Intel）/ Linux x64 四個檔案。
+
+**0.3.2 起主要放在 GitHub**（公開）：https://github.com/The78estHerry/go-screen-burn-in-fixer ；Gitea（私人）同步一份。v0.1.0～v0.3.1 的 Release 只在 Gitea。
 
 | 版本 | 內容 |
 |---|---|
@@ -60,11 +61,8 @@ https://gitea.littleherry.work/The78estWorld/go-screen-burn-in-fixer/releases
 - **同解析度的多台螢幕**：Ebitengine 的螢幕和作業系統的顯示器是用解析度對應的，兩台相同解析度時名稱與標記的對應可能互換。
 - **10 位元 / HDR 灰階**：目前輸出 8 位元 SDR，灰階最多 256 階。要支援需自己建立 10 位元 / HDR10 swap chain，使用者決定目前不做。
 - **程式碼簽章**：Windows（SmartScreen）與 macOS（Gatekeeper）都沒有簽章，使用者目前不打算購買。
-- **儲存庫是私人的**：Release 的檔案要登入 Gitea 才能下載；要給別人直接下載需改成公開。
+- **Gitea 是私人的**：外人只能從 GitHub 下載；給使用者看的連結一律指向 GitHub。
 
 ## 發新版的步驟
 
-1. 更新 `winres/winres.json` 裡所有版本號 → `go-winres make --arch amd64,arm64`。
-2. `go vet ./...`、`go test ./...`。
-3. `python tools/release/build.py` → `dist/release/` 四個檔案。
-4. commit、push（claude-bot），用 Gitea API 建立 Release 並上傳 `dist/release/*`（token 在 Git Credential Manager；用 `git credential fill` 取得），下載回來比對 SHA-256。
+見 [RELEASING.md](RELEASING.md)（GitHub 與 Gitea 兩邊都推、都發 Release）。

@@ -32,7 +32,7 @@ import (
 
 	"github.com/hajimehoshi/ebiten/v2"
 
-	"gitea.littleherry.work/The78estWorld/go-screen-burn-in-fixer/program"
+	"github.com/The78estHerry/go-screen-burn-in-fixer/program"
 )
 
 // 主程式定期送出播放位置的間隔：補上子程式啟動的延遲，並避免時間慢慢偏移。

@@ -7,7 +7,7 @@ import (
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
 
-	"gitea.littleherry.work/The78estWorld/go-screen-burn-in-fixer/internal/ui"
+	"github.com/The78estHerry/go-screen-burn-in-fixer/internal/ui"
 )
 
 // infoBar 控制播放與檢查時左上角資訊列的顯示（Burn-In 與檢查模式共用）。

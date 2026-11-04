@@ -7,8 +7,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"gitea.littleherry.work/The78estWorld/go-screen-burn-in-fixer/checks"
-	"gitea.littleherry.work/The78estWorld/go-screen-burn-in-fixer/internal/ui"
+	"github.com/The78estHerry/go-screen-burn-in-fixer/checks"
+	"github.com/The78estHerry/go-screen-burn-in-fixer/internal/ui"
 )
 
 func TestCheckSequence(t *testing.T) {

@@ -3,7 +3,7 @@ package patterns
 import (
 	"github.com/hajimehoshi/ebiten/v2"
 
-	"gitea.littleherry.work/The78estWorld/go-screen-burn-in-fixer/internal/gfx"
+	"github.com/The78estHerry/go-screen-burn-in-fixer/internal/gfx"
 )
 
 // shaderPattern 是以 Kage shader 繪製的圖樣。每個 shader 都會收到

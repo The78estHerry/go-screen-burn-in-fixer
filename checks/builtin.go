@@ -8,8 +8,8 @@ import (
 
 	"github.com/hajimehoshi/ebiten/v2"
 
-	"gitea.littleherry.work/The78estWorld/go-screen-burn-in-fixer/internal/gfx"
-	"gitea.littleherry.work/The78estWorld/go-screen-burn-in-fixer/internal/ui"
+	"github.com/The78estHerry/go-screen-burn-in-fixer/internal/gfx"
+	"github.com/The78estHerry/go-screen-burn-in-fixer/internal/ui"
 )
 
 var (

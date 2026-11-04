@@ -8,8 +8,8 @@ import (
 
 	"github.com/hajimehoshi/ebiten/v2"
 
-	"gitea.littleherry.work/The78estWorld/go-screen-burn-in-fixer/checks"
-	"gitea.littleherry.work/The78estWorld/go-screen-burn-in-fixer/internal/ui"
+	"github.com/The78estHerry/go-screen-burn-in-fixer/checks"
+	"github.com/The78estHerry/go-screen-burn-in-fixer/internal/ui"
 )
 
 // 檢查畫面預覽：每一階畫成一格（640x480，與 Burn-In 預覽同尺寸、1:1 像素），

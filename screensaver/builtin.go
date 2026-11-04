@@ -9,7 +9,7 @@ import (
 	"github.com/hajimehoshi/ebiten/v2/text/v2"
 	"golang.org/x/image/font/gofont/goregular"
 
-	"gitea.littleherry.work/The78estWorld/go-screen-burn-in-fixer/internal/gfx"
+	"github.com/The78estHerry/go-screen-burn-in-fixer/internal/gfx"
 )
 
 //go:embed aurora.kage

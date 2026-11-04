@@ -10,8 +10,8 @@ import (
 
 	"github.com/hajimehoshi/ebiten/v2"
 
-	"gitea.littleherry.work/The78estWorld/go-screen-burn-in-fixer/actions"
-	"gitea.littleherry.work/The78estWorld/go-screen-burn-in-fixer/program"
+	"github.com/The78estHerry/go-screen-burn-in-fixer/actions"
+	"github.com/The78estHerry/go-screen-burn-in-fixer/program"
 )
 
 // Snapshot 把各個畫面畫到離屏影像並存成 PNG（開發用）。不需要操作滑鼠鍵盤，

@@ -14,13 +14,13 @@ import (
 
 	"github.com/hajimehoshi/ebiten/v2"
 
-	"gitea.littleherry.work/The78estWorld/go-screen-burn-in-fixer/actions"
-	"gitea.littleherry.work/The78estWorld/go-screen-burn-in-fixer/app"
-	"gitea.littleherry.work/The78estWorld/go-screen-burn-in-fixer/checks"
-	"gitea.littleherry.work/The78estWorld/go-screen-burn-in-fixer/display"
-	"gitea.littleherry.work/The78estWorld/go-screen-burn-in-fixer/patterns"
-	"gitea.littleherry.work/The78estWorld/go-screen-burn-in-fixer/program"
-	"gitea.littleherry.work/The78estWorld/go-screen-burn-in-fixer/screensaver"
+	"github.com/The78estHerry/go-screen-burn-in-fixer/actions"
+	"github.com/The78estHerry/go-screen-burn-in-fixer/app"
+	"github.com/The78estHerry/go-screen-burn-in-fixer/checks"
+	"github.com/The78estHerry/go-screen-burn-in-fixer/display"
+	"github.com/The78estHerry/go-screen-burn-in-fixer/patterns"
+	"github.com/The78estHerry/go-screen-burn-in-fixer/program"
+	"github.com/The78estHerry/go-screen-burn-in-fixer/screensaver"
 )
 
 // 這些參數代表「直接播放」：有任何一個時跳過警告畫面與設定選單。

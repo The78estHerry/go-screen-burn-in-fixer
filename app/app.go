@@ -12,9 +12,9 @@ import (
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
 
-	"gitea.littleherry.work/The78estWorld/go-screen-burn-in-fixer/actions"
-	"gitea.littleherry.work/The78estWorld/go-screen-burn-in-fixer/display"
-	"gitea.littleherry.work/The78estWorld/go-screen-burn-in-fixer/program"
+	"github.com/The78estHerry/go-screen-burn-in-fixer/actions"
+	"github.com/The78estHerry/go-screen-burn-in-fixer/display"
+	"github.com/The78estHerry/go-screen-burn-in-fixer/program"
 )
 
 // 設定選單視窗的邏輯大小（實際大小再乘上螢幕縮放比例）。

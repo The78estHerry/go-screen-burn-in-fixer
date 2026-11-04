@@ -1,4 +1,4 @@
-module gitea.littleherry.work/The78estWorld/go-screen-burn-in-fixer
+module github.com/The78estHerry/go-screen-burn-in-fixer
 
 go 1.27.0
 

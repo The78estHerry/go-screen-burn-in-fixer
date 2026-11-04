@@ -1,4 +1,8 @@
+<p align="center"><img src="winres/icon.png" width="160" alt="go-screen-burn-in-fixer 圖示：顯示彩色測試條紋的螢幕"></p>
+
 # go-screen-burn-in-fixer
+
+**繁體中文** | [English](README.en.md) | [日本語](README.ja.md)
 
 在全螢幕即時播放「螢幕修復畫面」的小工具：快速閃爍的雜訊、彩色條紋、純色輪播與移動色條，讓面板上每個紅、綠、藍子像素在全亮與全暗之間反覆切換。播放結束後可以自動關閉程式、關機、睡眠，或切換成節奏緩慢的螢幕保護畫面。
 
@@ -73,7 +77,7 @@
 
 ### 下載
 
-到 [Releases](https://gitea.littleherry.work/The78estWorld/go-screen-burn-in-fixer/releases) 下載對應的檔案：
+到 [Releases](https://github.com/The78estHerry/go-screen-burn-in-fixer/releases) 下載對應的檔案：
 
 | 系統 | 檔案 |
 |---|---|
@@ -102,6 +106,8 @@ cd go-screen-burn-in-fixer-<版本>-linux-amd64
 
 **macOS 與 Linux 的限制**：螢幕名稱與 EDID 原生解析度目前只有 Windows 讀得到，其他系統的選單只顯示螢幕編號與解析度，`-list-monitors` 也不支援。
 
+**macOS 與 Linux 還沒有實機測試過**，歡迎回報結果。
+
 ### 點兩下執行
 
 1. 執行 `go-screen-burn-in-fixer.exe`。
@@ -128,6 +134,8 @@ cd go-screen-burn-in-fixer-<版本>-linux-amd64
 
 - 清單裡每個圖樣的秒數變成**一輪的總時間**，洗牌後總時間不變。
 - 「每段」可以選 15–60 秒隨機（預設）或固定 10、20、30、60 秒。
+- 同一個圖樣不會連續出現；播放時間超過一輪時，每一輪重新洗牌。某個圖樣佔一輪一半以上的時間時，它每一段會比較長，才能和其他圖樣交錯。
+- 資訊列顯示這個圖樣在這一輪已播放的時間，例如「gray-noise　本輪 3:20 / 10:00」。
 
 ### 播放時間
 
@@ -143,8 +151,6 @@ cd go-screen-burn-in-fixer-<版本>-linux-amd64
 | `2:30`、`2h30m` | 2 小時 30 分 |
 
 按 Enter 確定，Esc 取消輸入。
-- 同一個圖樣不會連續出現；播放時間超過一輪時，每一輪重新洗牌。某個圖樣佔一輪一半以上的時間時，它每一段會比較長，才能和其他圖樣交錯。
-- 資訊列顯示這個圖樣在這一輪已播放的時間，例如「gray-noise　本輪 3:20 / 10:00」。
 
 ### 播放 Burn-In 時的按鍵
 
@@ -198,9 +204,9 @@ cd go-screen-burn-in-fixer-<版本>-linux-amd64
 | `quit` | 關閉程式 |
 | `shutdown` | 倒數 60 秒後關機（倒數中按任意鍵取消） |
 | `sleep` | 倒數 60 秒後進入睡眠（倒數中按任意鍵取消） |
+| `screensaver` | 停止閃爍，切換成螢幕保護畫面，按鍵或移動滑鼠後結束 |
 
 倒數、警告、訊息畫面與資訊列的文字會緩慢地變暗再變亮（呼吸），不會以同樣的亮度一直停在同一個位置，避免文字本身造成烙印。
-| `screensaver` | 停止閃爍，切換成螢幕保護畫面，按鍵或移動滑鼠後結束 |
 
 ### 命令列參數
 
@@ -273,5 +279,7 @@ go run ./cmd/preview
 ## 授權
 
 本專案採用 [MIT License](LICENSE)。
+
+如果這個工具對你有幫助，歡迎透過 [GitHub Sponsors](https://github.com/sponsors/The78estHerry) 贊助。
 
 內嵌字型 Noto Sans TC（子集）採用 [SIL Open Font License 1.1](internal/ui/NotoSansTC-LICENSE.txt)。

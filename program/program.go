@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"gitea.littleherry.work/The78estWorld/go-screen-burn-in-fixer/patterns"
+	"github.com/The78estHerry/go-screen-burn-in-fixer/patterns"
 )
 
 // DefaultSegment 是每個圖樣預設播放的時間。

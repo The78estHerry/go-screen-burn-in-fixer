@@ -8,7 +8,7 @@ import (
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
 
-	"gitea.littleherry.work/The78estWorld/go-screen-burn-in-fixer/internal/ui"
+	"github.com/The78estHerry/go-screen-burn-in-fixer/internal/ui"
 )
 
 // 選單的共用小元件。版面以 WindowWidth × WindowHeight 的邏輯座標描述，繪製時再依視窗大小縮放。

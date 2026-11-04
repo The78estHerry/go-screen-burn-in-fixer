@@ -11,11 +11,11 @@ import (
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
 
-	"gitea.littleherry.work/The78estWorld/go-screen-burn-in-fixer/actions"
-	"gitea.littleherry.work/The78estWorld/go-screen-burn-in-fixer/internal/ui"
-	"gitea.littleherry.work/The78estWorld/go-screen-burn-in-fixer/patterns"
-	"gitea.littleherry.work/The78estWorld/go-screen-burn-in-fixer/program"
-	"gitea.littleherry.work/The78estWorld/go-screen-burn-in-fixer/screensaver"
+	"github.com/The78estHerry/go-screen-burn-in-fixer/actions"
+	"github.com/The78estHerry/go-screen-burn-in-fixer/internal/ui"
+	"github.com/The78estHerry/go-screen-burn-in-fixer/patterns"
+	"github.com/The78estHerry/go-screen-burn-in-fixer/program"
+	"github.com/The78estHerry/go-screen-burn-in-fixer/screensaver"
 )
 
 // uiScale 回傳把邏輯座標（WindowWidth × WindowHeight）放進畫面的縮放比例與左上角位移。

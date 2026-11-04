@@ -12,12 +12,12 @@ import (
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
 
-	"gitea.littleherry.work/The78estWorld/go-screen-burn-in-fixer/actions"
-	"gitea.littleherry.work/The78estWorld/go-screen-burn-in-fixer/checks"
-	"gitea.littleherry.work/The78estWorld/go-screen-burn-in-fixer/internal/ui"
-	"gitea.littleherry.work/The78estWorld/go-screen-burn-in-fixer/patterns"
-	"gitea.littleherry.work/The78estWorld/go-screen-burn-in-fixer/program"
-	"gitea.littleherry.work/The78estWorld/go-screen-burn-in-fixer/screensaver"
+	"github.com/The78estHerry/go-screen-burn-in-fixer/actions"
+	"github.com/The78estHerry/go-screen-burn-in-fixer/checks"
+	"github.com/The78estHerry/go-screen-burn-in-fixer/internal/ui"
+	"github.com/The78estHerry/go-screen-burn-in-fixer/patterns"
+	"github.com/The78estHerry/go-screen-burn-in-fixer/program"
+	"github.com/The78estHerry/go-screen-burn-in-fixer/screensaver"
 )
 
 // 設定選單。上方（模式、螢幕）三種模式共用；中間依模式顯示圖樣或檢查項目清單；

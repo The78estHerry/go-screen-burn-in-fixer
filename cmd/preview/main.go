@@ -17,9 +17,9 @@ import (
 
 	"github.com/hajimehoshi/ebiten/v2"
 
-	"gitea.littleherry.work/The78estWorld/go-screen-burn-in-fixer/checks"
-	"gitea.littleherry.work/The78estWorld/go-screen-burn-in-fixer/patterns"
-	"gitea.littleherry.work/The78estWorld/go-screen-burn-in-fixer/screensaver"
+	"github.com/The78estHerry/go-screen-burn-in-fixer/checks"
+	"github.com/The78estHerry/go-screen-burn-in-fixer/patterns"
+	"github.com/The78estHerry/go-screen-burn-in-fixer/screensaver"
 )
 
 // 時鐘預覽使用固定時間，讓每次產生的影片都相同。

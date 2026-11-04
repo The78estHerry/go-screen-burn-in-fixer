@@ -12,7 +12,7 @@ import (
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
 	"github.com/hajimehoshi/ebiten/v2/vector"
 
-	"gitea.littleherry.work/The78estWorld/go-screen-burn-in-fixer/checks"
+	"github.com/The78estHerry/go-screen-burn-in-fixer/checks"
 )
 
 // 移動滑鼠後十字游標顯示的時間。
