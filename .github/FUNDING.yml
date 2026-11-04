@@ -1,6 +1,7 @@
 # GitHub 會依這個檔案在 repo 頁面顯示「Sponsor」按鈕（只有 GitHub 認得，Gitea 會忽略）。
 # 說明：https://docs.github.com/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/displaying-a-sponsor-button-in-your-repository
 #
-# 只用 PayPal。GitHub Sponsors 不支援台灣，不使用（2026-11-04 使用者決定）。
+# 用 Ko-fi 和 PayPal。GitHub Sponsors 不支援台灣，不使用（2026-11-04 使用者決定）。
 
+ko_fi: the78ester   # Ko-fi 帳號（https://ko-fi.com/the78ester）
 custom: ["https://paypal.me/The78ester"]   # 其他網址，最多 4 個

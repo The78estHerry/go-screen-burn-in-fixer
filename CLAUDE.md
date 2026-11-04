@@ -273,6 +273,7 @@ go build -trimpath -ldflags "-s -w -H windowsgui" -o dist/go-screen-burn-in-fixe
 - [x] 上傳 Gitea
 - [x] 準備公開到 GitHub（0.3.2：module 路徑、三語 README、FUNDING.yml、RELEASING.md）
 - [x] 贊助只用 PayPal（2026-11-04：README 三語、FUNDING.yml、RELEASING.md、STATUS.md、v0.3.2 的 Release 說明兩邊；樣式見 gitea-to-github 的 readme-style.md。不要用 GitHub Sponsors：不支援台灣）
+- [x] 加上 Ko-fi（2026-11-04：`https://ko-fi.com/the78ester`，README 三語的徽章與贊助句、FUNDING.yml 的 `ko_fi`；Release 說明沒改）
 - [x] 檢查模式（預覽已確認、選單、手動 / 自動、灰階分階、標記、資訊列設定）
 - [x] v0.1.0 Release（附 exe）
 - [x] 多螢幕同時播放、洗牌播放（第 12 節）

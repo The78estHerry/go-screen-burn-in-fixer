@@ -6,9 +6,9 @@
 
 > The Traditional Chinese README is the primary version. If this translation differs from it, the Chinese version is correct.
 
-[![PayPal](https://img.shields.io/badge/PayPal-paypal.me%2FThe78ester-00457C?logo=paypal&logoColor=white)](https://paypal.me/The78ester)
+[![PayPal](https://img.shields.io/badge/PayPal-paypal.me%2FThe78ester-00457C?logo=paypal&logoColor=white)](https://paypal.me/The78ester) [![Ko-fi](https://img.shields.io/badge/Ko--fi-the78ester-FF5E5B?logo=kofi&logoColor=white)](https://ko-fi.com/the78ester)
 
-💖 If this tool helps you, please consider supporting development via [PayPal](https://paypal.me/The78ester).
+💖 If this tool helps you, please consider supporting development via [PayPal](https://paypal.me/The78ester) or [Ko-fi](https://ko-fi.com/the78ester).
 
 A small tool that plays "screen repair" patterns full screen in real time: fast-flashing noise, colored stripes, solid color cycles and moving bars, so that every red, green and blue subpixel on the panel is switched between fully on and fully off again and again. When playback ends it can quit, shut down, sleep, or switch to a slow, dark screensaver.
 
@@ -290,4 +290,4 @@ This project is licensed under the [MIT License](LICENSE).
 
 The embedded font Noto Sans TC (subset) is licensed under the [SIL Open Font License 1.1](internal/ui/NotoSansTC-LICENSE.txt).
 
-If this tool helps you, sponsorship to support development is welcome via [PayPal](https://paypal.me/The78ester).
+If this tool helps you, sponsorship to support development is welcome via [PayPal](https://paypal.me/The78ester) or [Ko-fi](https://ko-fi.com/the78ester).
