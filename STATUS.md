@@ -8,6 +8,8 @@
 
 **0.3.2 起主要放在 GitHub**（公開）：https://github.com/The78estHerry/go-screen-burn-in-fixer ；Gitea（私人）同步一份。v0.1.0～v0.3.1 的 Release 只在 Gitea。
 
+- 2026-11-04：main 與 v0.1.0～v0.3.1 全部 tag 已推上 GitHub。**下一步**：`build.py` 產生 0.3.2 → 使用者實測 → tag v0.3.2、兩邊建 Release（見 RELEASING.md）。
+
 | 版本 | 內容 |
 |---|---|
 | v0.1.0 | Burn-In 圖樣、定時與後續動作、螢幕保護、檢查模式（烙印 / 殘影 / 壞點）、設定選單 |
