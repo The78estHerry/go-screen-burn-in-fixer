@@ -9,7 +9,7 @@
 **0.3.2 起主要放在 GitHub**（公開）：https://github.com/The78estHerry/go-screen-burn-in-fixer ；Gitea（私人）同步一份。v0.1.0～v0.3.1 的 Release 只在 Gitea。
 
 - 2026-11-04：main 與全部 tag 推上 GitHub；使用者實測 0.3.2 通過後發佈 **v0.3.2**（GitHub Release id 433618822、Gitea id 19），兩邊下載比對 SHA-256 一致。
-- **下一步：0.4.0 英文介面**（使用者要求）：程式內可切換英文／中文，預設英文；切換放在選單右上角「English | 中文」。
+- 2026-11-04：發佈 **v0.4.0**（英文介面，見下方）。
 
 | 版本 | 內容 |
 |---|---|
