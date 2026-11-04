@@ -23,3 +23,6 @@ go.work.sum
 /dist/
 /go-screen-burn-in-fixer
 go-screen-burn-in-fixer.json
+
+# Claude Code 本機設定（commit 信箱等）
+.claude/settings.local.json

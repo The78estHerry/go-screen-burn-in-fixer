@@ -194,6 +194,7 @@ go build -trimpath -ldflags "-s -w -H windowsgui" -o dist/go-screen-burn-in-fixe
 - **macOS、Linux 尚未實機測試**；`display`（螢幕名稱、EDID）目前只有 Windows 實作，其他平台回傳不支援，選單只顯示編號與解析度。
 
 - **GitHub 決定**（2026-11-04）：公開。GitHub `The78estHerry/go-screen-burn-in-fixer` 是主要位置（`github` remote），Gitea `The78estWorld/go-screen-burn-in-fixer`（`origin`，私人）同步一份；兩邊都推、都發 Release（`RELEASING.md`）。module 路徑是 `github.com/The78estHerry/go-screen-burn-in-fixer`（0.3.2 起）。README、程式裡給使用者看的連結一律指向 GitHub。macOS bundle ID `work.littleherry.go-screen-burn-in-fixer` 不改。經驗整理在 `C:/WorkapceAI/gitea-to-github`。
+- **commit 信箱**（2026-11-04 使用者指定，只限本專案）：claude-bot 在這個專案用 `littleherry@gmail.com`（不是全域的 舊的網域信箱）。設定在 `.claude/settings.local.json` 的 `env`（不進版本控制；換電腦要重建）。歷史已用 `git filter-branch` 全部改寫並 force push 到兩邊，內容（tree）與改寫前完全相同。
 - README 有繁中（正式版）、英文、日文三份（`README.md`、`README.en.md`、`README.ja.md`），改內容時三份一起改；最上方顯示 `winres/icon.png`。
 - 圖示、版本資訊、manifest：`winres/winres.json` + `winres/icon.png`、`icon16.png`（由 `go run ./tools/icon` 繪製），用 `go-winres make --arch amd64,arm64` 產生根目錄的 `rsrc_windows_*.syso`（納入版本控制，`go build` 自動連結）。go-winres 是建置工具，不在 `go.mod` 裡。
 - **發新版時**：同時更新 `winres/winres.json` 中所有版本號（`identity.version`、`file_version`、`product_version`、各語言的 `FileVersion`、`ProductVersion`），重新 `go-winres make`。
