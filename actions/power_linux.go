@@ -26,7 +26,7 @@ func keepAwakeCmd() (*exec.Cmd, func()) {
 		return exec.Command("sleep", "infinity"), end // 沒有 systemd：只靠 xdg-screensaver
 	}
 	return exec.Command("systemd-inhibit", "--what=idle:sleep", "--who=go-screen-burn-in-fixer",
-		"--why=播放螢幕修復畫面", "--mode=block", "sleep", "infinity"), end
+		"--why=Playing screen repair patterns", "--mode=block", "sleep", "infinity"), end
 }
 
 func shutdown() error { return run("systemctl", "poweroff") }

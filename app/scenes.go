@@ -12,6 +12,7 @@ import (
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
 
 	"github.com/The78estHerry/go-screen-burn-in-fixer/actions"
+	"github.com/The78estHerry/go-screen-burn-in-fixer/internal/i18n"
 	"github.com/The78estHerry/go-screen-burn-in-fixer/internal/ui"
 	"github.com/The78estHerry/go-screen-burn-in-fixer/patterns"
 	"github.com/The78estHerry/go-screen-burn-in-fixer/program"
@@ -45,7 +46,7 @@ func (warningScene) Draw(a *App, screen *ebiten.Image) {
 	s, ox, oy := uiScale(screen)
 	cx := ox + WindowWidth/2*s
 	f := breathNow()
-	ui.Text(screen, "⚠ 警告", cx, oy+150*s, 44*s, dimmed(ui.ColorWarning, f), ui.Center)
+	ui.Text(screen, i18n.T("⚠ 警告", "⚠ Warning"), cx, oy+150*s, 44*s, dimmed(ui.ColorWarning, f), ui.Center)
 	lines := []string{
 		"本程式內含快速閃爍的畫面。",
 		"光敏性癲癇患者或對閃光敏感的人請勿觀看，",
@@ -54,10 +55,21 @@ func (warningScene) Draw(a *App, screen *ebiten.Image) {
 		"OLED 烙印是永久性的面板老化，無法用任何畫面修復；",
 		"本工具可能有助於減輕暫時性殘影或喚醒卡住的像素，但不保證有效。",
 	}
+	if i18n.Current() == i18n.EN {
+		lines = []string{
+			"This program contains rapidly flashing images.",
+			"Do not watch if you have photosensitive epilepsy or are sensitive to flashing lights.",
+			"Avoid staring at the screen during playback.",
+			"",
+			"OLED burn-in is permanent panel aging and cannot be fixed by any image.",
+			"This tool may help reduce temporary image retention or wake stuck pixels,",
+			"but there is no guarantee.",
+		}
+	}
 	for i, l := range lines {
 		ui.Text(screen, l, cx, oy+(250+float64(i)*38)*s, 22*s, dimmed(ui.ColorText, f), ui.Center)
 	}
-	ui.Text(screen, "按任意鍵或點一下繼續　　Esc 結束", cx, oy+560*s, 20*s, dimmed(ui.ColorDim, f), ui.Center)
+	ui.Text(screen, i18n.T("按任意鍵或點一下繼續　　Esc 結束", "Press any key or click to continue        Esc to quit"), cx, oy+560*s, 20*s, dimmed(ui.ColorDim, f), ui.Center)
 }
 
 // ── 播放 Burn-In ─────────────────────────────────────────
@@ -210,16 +222,17 @@ func (s *playScene) Draw(a *App, screen *ebiten.Image) {
 	}
 	state := ""
 	if s.paused {
-		state = "　［暫停］"
+		state = i18n.T("　［暫停］", "   [paused]")
 	}
 	seg := s.prog[idx]
-	where := fmt.Sprintf("（%d/%d）", idx+1, len(s.prog))
+	where := fmt.Sprintf(i18n.T("（%d/%d）", " (%d/%d)"), idx+1, len(s.prog))
 	if seg.PatternTotal > 0 { // 洗牌：顯示這個圖樣在這一輪已播放的時間
-		where = fmt.Sprintf("　本輪 %s / %s", formatDuration(seg.Played+off), formatDuration(seg.PatternTotal))
+		where = fmt.Sprintf(i18n.T("　本輪 %s / %s", "   this round %s / %s"), formatDuration(seg.Played+off), formatDuration(seg.PatternTotal))
 	}
-	line1 := fmt.Sprintf("%s%s　剩餘 %s　%.0f FPS%s",
+	line1 := fmt.Sprintf(i18n.T("%s%s　剩餘 %s　%.0f FPS%s", "%s%s   %s left   %.0f FPS%s"),
 		seg.Pattern, where, formatDuration(s.timer-s.elapsed()), ebiten.ActualFPS(), state)
-	s.info.draw(screen, line1, "Esc 回到選單　空白鍵 暫停　← → 切換圖樣　H 資訊列　按住 S 顯示")
+	s.info.draw(screen, line1, i18n.T("Esc 回到選單　空白鍵 暫停　← → 切換圖樣　H 資訊列　按住 S 顯示",
+		"Esc menu   Space pause   ← → change pattern   H info bar   hold S show"))
 }
 
 // formatDuration 把時間格式化成 h:mm:ss 或 m:ss。
@@ -261,14 +274,14 @@ func (s *countdownScene) Update(a *App) error {
 	}
 	if a.opts.DryRun {
 		log.Printf("測試模式：倒數結束，略過「%s」", s.action.Label())
-		a.showMessage(fmt.Sprintf("測試模式（-dry-run）：此時會「%s」，實際未執行。", s.action.Label()), 10*time.Second, func() error {
+		a.showMessage(fmt.Sprintf(i18n.T("測試模式（-dry-run）：此時會「%s」，實際未執行。", "Test mode (-dry-run): would %s now, but did not."), s.action.Verb()), 10*time.Second, func() error {
 			a.goMenu()
 			return nil
 		})
 		return nil
 	}
 	if err := actions.Execute(s.action); err != nil {
-		a.showMessage(fmt.Sprintf("無法%s：%v", s.action.Label(), err), time.Minute, func() error {
+		a.showMessage(fmt.Sprintf(i18n.T("無法%s：%v", "Could not %s: %v"), s.action.Verb(), err), time.Minute, func() error {
 			a.goMenu()
 			return nil
 		})
@@ -299,11 +312,11 @@ func (s *countdownScene) Draw(a *App, screen *ebiten.Image) {
 	elapsed := time.Since(s.start)
 	left := s.duration - elapsed
 	f := breath(elapsed) // 從最亮開始呼吸
-	ui.Text(screen, fmt.Sprintf("即將%s", s.action.Label()), cx, oy+200*sc, 40*sc, dimmed(ui.ColorText, f), ui.Center)
+	ui.Text(screen, s.action.CountdownTitle(), cx, oy+200*sc, 40*sc, dimmed(ui.ColorText, f), ui.Center)
 	ui.Text(screen, fmt.Sprintf("%d", int(math.Ceil(left.Seconds()))), cx, oy+280*sc, 120*sc, dimmed(ui.ColorWarning, f), ui.Center)
-	ui.Text(screen, "按任意鍵、點一下或移動滑鼠取消", cx, oy+480*sc, 24*sc, dimmed(ui.ColorDim, f), ui.Center)
+	ui.Text(screen, i18n.T("按任意鍵、點一下或移動滑鼠取消", "Press any key, click or move the mouse to cancel"), cx, oy+480*sc, 24*sc, dimmed(ui.ColorDim, f), ui.Center)
 	if a.opts.DryRun {
-		ui.Text(screen, "（測試模式：不會真的執行）", cx, oy+530*sc, 20*sc, dimmed(ui.ColorDim, f), ui.Center)
+		ui.Text(screen, i18n.T("（測試模式：不會真的執行）", "(Test mode: nothing will actually happen)"), cx, oy+530*sc, 20*sc, dimmed(ui.ColorDim, f), ui.Center)
 	}
 }
 
@@ -413,5 +426,5 @@ func (s *messageScene) Draw(a *App, screen *ebiten.Image) {
 	cx := ox + WindowWidth/2*sc
 	f := breathNow()
 	ui.Text(screen, s.msg, cx, oy+300*sc, 24*sc, dimmed(ui.ColorText, f), ui.Center)
-	ui.Text(screen, "按任意鍵繼續", cx, oy+400*sc, 20*sc, dimmed(ui.ColorDim, f), ui.Center)
+	ui.Text(screen, i18n.T("按任意鍵繼續", "Press any key to continue"), cx, oy+400*sc, 20*sc, dimmed(ui.ColorDim, f), ui.Center)
 }

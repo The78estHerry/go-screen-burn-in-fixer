@@ -32,8 +32,9 @@ app/menu.go                設定選單（三種模式；版面以 1000×720 邏
 app/menu_widgets.go        選單小元件（selector、radio、checkbox、button）
 app/config.go              設定檔：exe 旁邊的 go-screen-burn-in-fixer.json
 app/multi.go               多螢幕：主程式啟動子程式、以標準輸入／輸出傳送指令（見第 12 節）
-app/snapshot.go            開發用：-snapshot 把各畫面存成 PNG（不操作桌面）
+app/snapshot.go            開發用：-snapshot 把各畫面存成 PNG（不操作桌面；英文、中文各一份）
 internal/gfx/              Kage shader 共用函式（common.kage）、延遲編譯、繪製
+internal/i18n/             介面語言（英文／繁體中文）：T("中文", "English")、Text（見第 13 節）
 internal/ui/               字型（Noto Sans TC 子集）、顏色、繪圖輔助
 patterns/registry.go       Burn-In 圖樣介面 + Register()
 patterns/builtin.go        內建圖樣註冊與預設參數；shader 在 patterns/*.kage
@@ -159,7 +160,8 @@ type Pattern interface {
 | `-windowed` | 視窗模式（開發測試用） |
 | `-dry-run` | 不真的關機 / 睡眠 |
 | `-countdown 60s` | 關機 / 睡眠前的倒數時間 |
-| `-snapshot <資料夾>` | 開發用：把各畫面存成 PNG 後結束 |
+| `-lang en\|zh` | 介面語言（預設用選單設定；設定檔沒有時英文） |
+| `-snapshot <資料夾>` | 開發用：把各畫面存成 PNG 後結束（`<資料夾>/en/`、`<資料夾>/zh/`） |
 
 - 播放按鍵：Esc 回到設定選單（帶參數執行時直接結束）、空白鍵暫停、← / → 切換圖樣、H 顯示 / 隱藏資訊列（圖樣、剩餘時間、FPS；移動滑鼠也會顯示 3 秒）。播放時隱藏滑鼠游標。
 - `ebiten.SetTPS(ebiten.SyncWithFPS)`：每次畫面更新換一格雜訊，配合螢幕更新率（120Hz 螢幕就是每秒 120 格）。
@@ -204,13 +206,23 @@ go build -trimpath -ldflags "-s -w -H windowsgui" -o dist/go-screen-burn-in-fixe
 
 1. `go vet ./...`、`go test ./...`（EDID 解析、節目表、字型缺字檢查、實際查詢顯示器）。
 2. `-list`、`-list-monitors` 輸出正確。以 windowsgui 建置的 exe 在 PowerShell 中不會等它結束，測試時用 `Start-Process -Wait -RedirectStandardOutput <檔案>`。
-3. 版面：`go run . -snapshot <資料夾>` 產生 PNG 檢查。**不要用 SendKeys 之類的方式操作桌面**（按鍵可能送到使用者其他視窗）。
+3. 版面：`go run . -snapshot <資料夾>` 產生 PNG 檢查，**英文和中文兩份都要看**（英文通常比較寬）。**不要用 SendKeys 之類的方式操作桌面**（按鍵可能送到使用者其他視窗）。
 4. 流程：`-windowed -program moving-bar:3 -timer 4s -after quit`（應自行結束）、`-after shutdown -dry-run -countdown 3s`（記錄應顯示「略過關機」）。自動測試優先用 `moving-bar`，避免在使用者面前突然出現快速閃爍的畫面。
 5. 多螢幕的流程可以在單一螢幕上測：`-windowed -monitor 1,1 ...` 會在同一個螢幕開兩個視窗（子程式也是視窗模式）。確認子程式跟著主程式結束（`Get-Process` 沒有殘留）、主程式被強制結束時子程式也會結束。
 6. 全螢幕、實際多螢幕、實際按鍵操作、真的關機 / 睡眠：請使用者手動測試，或先取得同意。
 7. exe 複製到空資料夾單獨執行，不需要其他檔案。
 
 ---
+
+## 13. 介面語言（0.4.0）
+
+- 介面有英文與繁體中文，**預設英文**（使用者指定）。選單右上角「English | 中文」切換（`app/menu.go` 的 `langRow`），存在設定檔 `lang`（`en`／`zh`）。命令列 `-lang` 優先；多螢幕的子程式由主程式傳 `-lang`。
+- **畫面上的文字一律寫成 `i18n.T("中文", "English")`**，在繪製當下才選擇，所以切換後立刻生效。`init()` 時就建立的資料（圖樣、檢查項目、螢幕保護的說明）用 `i18n.Text{ZH, EN}`，在 `Description()` 等方法裡呼叫 `.String()`；套件層級的錯誤值用 `i18n.Error`。不要在啟動時把文字算好存起來（例如螢幕說明改成 `monitor.label()` 方法）。
+- 只翻譯使用者看得到的：選單、場景、資訊列、錯誤訊息、`-list` 輸出、參數說明。`log` 與 `panic` 給開發者看，維持中文。
+- 格式字串兩種語言的參數順序要一致。
+- 版面：英文比中文寬。位置盡量依 `ui.Measure` 計算（例如圖樣列的「依序／洗牌／每段」），中文維持原本的位置；清單說明用 `fitText` 依寬度截斷；資訊列太長時自動換行。新增文字後兩種語言都要用 `-snapshot` 看過。
+- 英文用語：Burn-in repair、Test screens、Screensaver only、Play time、When done、Info bar、Gray field、Gray steps、Marks、Manual、Slice。README.en.md 與日文版引用介面文字時用這些英文原文。
+- 測試：`internal/i18n` 的單元測試；`checks` 檢查英文介面不混入中文；`app` 的 `TestConfigLang`（沒有 `lang` 時是英文）。
 
 ## 11. 檢查模式（已實作）
 
@@ -265,5 +277,6 @@ go build -trimpath -ldflags "-s -w -H windowsgui" -o dist/go-screen-burn-in-fixe
 - [x] 播放時間可直接輸入（90、3h、2:30、2h30m，最長 72 小時）；exe 加上圖示與版本資訊（go-winres）
 - [x] macOS（Apple Silicon / Intel）與 Linux x64 版本（`tools/release/build.py`）；播放結束後設定選單回到原本的螢幕與位置
 - [ ] macOS、Linux 實機測試
+- [x] 英文介面（0.4.0）：預設英文，選單右上角切換英文／中文（第 13 節）
 - [x] EDID 原生解析度：也讀 CTA-861 與 DisplayID（Type I / VII）擴充區塊，取像素最多的詳細時序（超寬螢幕常把原生模式放在擴充區塊）
 - [x] 使用者手動測試（Windows）：全螢幕、選單操作、螢幕保護、檢查模式、多螢幕、真的關機 / 睡眠

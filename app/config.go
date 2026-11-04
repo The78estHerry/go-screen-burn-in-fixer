@@ -11,6 +11,7 @@ import (
 
 	"github.com/The78estHerry/go-screen-burn-in-fixer/actions"
 	"github.com/The78estHerry/go-screen-burn-in-fixer/checks"
+	"github.com/The78estHerry/go-screen-burn-in-fixer/internal/i18n"
 	"github.com/The78estHerry/go-screen-burn-in-fixer/patterns"
 	"github.com/The78estHerry/go-screen-burn-in-fixer/program"
 	"github.com/The78estHerry/go-screen-burn-in-fixer/screensaver"
@@ -64,6 +65,7 @@ type SegmentConfig struct {
 
 // Config 是使用者設定，存在 exe 旁邊的 go-screen-burn-in-fixer.json。
 type Config struct {
+	Lang         string          `json:"lang"` // 介面語言：en（預設）或 zh
 	Mode         Mode            `json:"mode"`
 	Monitors     []int           `json:"monitors"` // 要播放的螢幕（從 0 開始，依選單中的順序）
 	Segments     []SegmentConfig `json:"segments"`
@@ -110,6 +112,7 @@ const DefaultCheckSeconds = 10
 // 檢查項目全部自動 10 秒；資訊列顯示 5 秒。
 func DefaultConfig() Config {
 	c := Config{
+		Lang:         string(i18n.Default),
 		Mode:         ModeBurnIn,
 		Monitors:     []int{0},
 		TimerSeconds: 50 * 60,
@@ -180,6 +183,8 @@ func (c Config) Save(path string) error {
 // normalize 修正無效的值，並補上新版本新增、舊設定檔沒有的圖樣。
 func (c *Config) normalize() {
 	def := DefaultConfig()
+	l, _ := i18n.Parse(c.Lang)
+	c.Lang = string(l)
 	if c.Mode != ModeBurnIn && c.Mode != ModeCheck && c.Mode != ModeScreensaver {
 		c.Mode = def.Mode
 	}

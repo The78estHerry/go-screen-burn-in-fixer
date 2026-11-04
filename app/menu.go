@@ -14,6 +14,7 @@ import (
 
 	"github.com/The78estHerry/go-screen-burn-in-fixer/actions"
 	"github.com/The78estHerry/go-screen-burn-in-fixer/checks"
+	"github.com/The78estHerry/go-screen-burn-in-fixer/internal/i18n"
 	"github.com/The78estHerry/go-screen-burn-in-fixer/internal/ui"
 	"github.com/The78estHerry/go-screen-burn-in-fixer/patterns"
 	"github.com/The78estHerry/go-screen-burn-in-fixer/program"
@@ -66,7 +67,7 @@ func (m *menuScene) items(a *App) []item {
 	var items []item
 	m.defaultView = nil
 
-	items = append(items, m.modeRow(cfg), m.monitorRow(a))
+	items = append(items, m.langRow(cfg), m.modeRow(cfg), m.monitorRow(a))
 	switch cfg.Mode {
 	case ModeCheck:
 		items = append(items, m.checkItems(cfg)...)
@@ -74,14 +75,14 @@ func (m *menuScene) items(a *App) []item {
 		items = append(items, m.burnInItems(cfg)...)
 	}
 
-	label := "開始播放　Enter"
+	label := i18n.T("開始播放　Enter", "Start　Enter")
 	if cfg.Mode == ModeCheck {
-		label = "開始檢查　Enter"
+		label = i18n.T("開始檢查　Enter", "Start test　Enter")
 	}
 	m.startIdx = len(items)
 	items = append(items,
 		button(ui.Rect{X: 620, Y: 672, W: 190, H: 36}, label, true, func() { m.start(a) }, false),
-		button(ui.Rect{X: 830, Y: 672, W: 130, H: 36}, "結束　Esc", false, func() { m.quit = true }, false),
+		button(ui.Rect{X: 830, Y: 672, W: 130, H: 36}, i18n.T("結束　Esc", "Quit　Esc"), false, func() { m.quit = true }, false),
 	)
 	return items
 }
@@ -90,7 +91,7 @@ func (m *menuScene) modeRow(cfg *Config) item {
 	modes := []struct {
 		mode  Mode
 		label string
-	}{{ModeBurnIn, "Burn-In 修復"}, {ModeCheck, "檢查畫面"}, {ModeScreensaver, "只播螢幕保護"}}
+	}{{ModeBurnIn, i18n.T("Burn-In 修復", "Burn-in repair")}, {ModeCheck, i18n.T("檢查畫面", "Test screens")}, {ModeScreensaver, i18n.T("只播螢幕保護", "Screensaver only")}}
 	var clicks []clickArea
 	var draws []func(*painter)
 	x := colValue
@@ -112,13 +113,83 @@ func (m *menuScene) modeRow(cfg *Config) item {
 	return item{
 		row: ui.Rect{X: 20, Y: 74, W: 960, H: 34}, left: cycle(-1), right: cycle(1), clicks: clicks,
 		draw: func(p *painter, _, _ bool) {
-			p.text("模式", colLabel, 80, 17, ui.ColorDim, ui.Left)
+			p.text(i18n.T("模式", "Mode"), colLabel, 80, 17, ui.ColorDim, ui.Left)
 			for _, d := range draws {
 				d(p)
 			}
 		},
 	}
 }
+
+// langRow：右上角的語言切換「English | 中文」。點一下切換；鍵盤 ↑ 移到最上面後 ←→ 切換。
+// 切換後畫面上所有文字立刻改變（文字都在繪製時才決定）。
+func (m *menuScene) langRow(cfg *Config) item {
+	const y = 28.0
+	langs := []struct {
+		lang  i18n.Lang
+		label string
+	}{{i18n.EN, "English"}, {i18n.ZH, "中文"}}
+	sep := "  |  "
+	sepW, _ := ui.Measure(sep, 17)
+	widths := make([]float64, len(langs))
+	total := sepW * float64(len(langs)-1)
+	for i, l := range langs {
+		widths[i], _ = ui.Measure(l.label, 17)
+		total += widths[i]
+	}
+	set := func(l i18n.Lang) func() {
+		return func() {
+			m.cancelEdit()
+			i18n.Set(l)
+			cfg.Lang = string(l)
+		}
+	}
+	toggle := func() {
+		if i18n.Current() == i18n.EN {
+			set(i18n.ZH)()
+		} else {
+			set(i18n.EN)()
+		}
+	}
+	x0 := 960 - total
+	var clicks []clickArea
+	xs := make([]float64, len(langs))
+	x := x0
+	for i, l := range langs {
+		xs[i] = x
+		clicks = append(clicks, clickArea{ui.Rect{X: x - 6, Y: y - 6, W: widths[i] + 12, H: 30}, set(l.lang)})
+		x += widths[i] + sepW
+	}
+	return item{
+		row: ui.Rect{X: x0 - 12, Y: y - 8, W: total + 24, H: 34}, left: toggle, right: toggle, activate: toggle, clicks: clicks,
+		draw: func(p *painter, focused, _ bool) {
+			for i, l := range langs {
+				clr := ui.ColorDim
+				if l.lang == i18n.Current() {
+					clr = ui.ColorText
+					p.fill(ui.Rect{X: xs[i], Y: y + 25, W: widths[i], H: 2}, ui.ColorAccent)
+				}
+				p.text(l.label, xs[i], y, 17, clr, ui.Left)
+				if i < len(langs)-1 {
+					p.text(sep, xs[i]+widths[i], y, 17, ui.ColorBorder, ui.Left)
+				}
+			}
+		},
+	}
+}
+
+// secondsColLeft 是清單上方「每段秒數」標題的左邊界：同一列左側的元件不能超過這裡。
+const secondsColLeft = secondsX + 75 - 36
+
+// fieldLabelW 是灰階全畫面「最暗／最亮／階數」標籤的寬度（取兩種語言中較寬的，切換語言時位置不變）。
+var fieldLabelW = func() float64 {
+	w := 0.0
+	for _, s := range []string{"最暗", "最亮", "階數", "Min", "Max", "Steps"} {
+		lw, _ := ui.Measure(s, 15)
+		w = max(w, lw)
+	}
+	return w
+}()
 
 func (m *menuScene) setMode(cfg *Config, mode Mode) {
 	if cfg.Mode != mode {
@@ -135,12 +206,12 @@ func (m *menuScene) monitorRow(a *App) item {
 	const y = 122.0
 	row := ui.Rect{X: 20, Y: 116, W: 960, H: 34}
 	if len(a.monitors) <= 1 {
-		label := "（找不到螢幕）"
+		label := i18n.T("（找不到螢幕）", "(no monitor found)")
 		if len(a.monitors) == 1 {
-			label = a.monitors[0].label
+			label = a.monitors[0].label()
 		}
 		return item{row: row, draw: func(p *painter, _, _ bool) {
-			p.text("螢幕", colLabel, y, 17, ui.ColorDim, ui.Left)
+			p.text(i18n.T("螢幕", "Monitors"), colLabel, y, 17, ui.ColorDim, ui.Left)
 			p.text(label, colValue, y, 17, ui.ColorText, ui.Left)
 		}}
 	}
@@ -149,13 +220,13 @@ func (m *menuScene) monitorRow(a *App) item {
 	labels := make([]string, len(a.monitors))
 	width := 0.0
 	for i, mon := range a.monitors {
-		labels[i] = mon.short
-		w, _ := ui.Measure(mon.short, 17)
+		labels[i] = mon.short()
+		w, _ := ui.Measure(labels[i], 17)
 		width += w + 60
 	}
 	if width > 960-colValue {
 		for i, mon := range a.monitors {
-			labels[i] = mon.tiny
+			labels[i] = mon.tiny()
 		}
 	}
 	m.monCursor = min(m.monCursor, len(a.monitors)-1)
@@ -188,7 +259,7 @@ func (m *menuScene) monitorRow(a *App) item {
 		row: row, left: move(-1), right: move(1), clicks: clicks,
 		activate: func() { toggle(m.monCursor)() },
 		draw: func(p *painter, focused, _ bool) {
-			p.text("螢幕", colLabel, y, 17, ui.ColorDim, ui.Left)
+			p.text(i18n.T("螢幕", "Monitors"), colLabel, y, 17, ui.ColorDim, ui.Left)
 			for _, d := range draws {
 				d(p, focused)
 			}
@@ -241,8 +312,8 @@ func listRow(i int, name string, desc func() string, enabled *bool, seconds func
 // listHeader 繪製清單標題與「全選 / 全不選」按鈕。
 func listButtons(setAll func(bool) func(), disabled bool) []item {
 	return []item{
-		button(ui.Rect{X: previewX, Y: 470, W: 150, H: 34}, "全選", false, setAll(true), disabled),
-		button(ui.Rect{X: previewX + 170, Y: 470, W: 150, H: 34}, "全不選", false, setAll(false), disabled),
+		button(ui.Rect{X: previewX, Y: 470, W: 150, H: 34}, i18n.T("全選", "Select all"), false, setAll(true), disabled),
+		button(ui.Rect{X: previewX + 170, Y: 470, W: 150, H: 34}, i18n.T("全不選", "Select none"), false, setAll(false), disabled),
 	}
 }
 
@@ -255,11 +326,24 @@ func (m *menuScene) burnInItems(cfg *Config) []item {
 	// 順序：依序 / 洗牌 | 每段長度
 	{
 		const y = 178.0
-		seqC, seqW, seqD := radio(95, y, "依序", func() bool { return !cfg.Shuffle }, func() { cfg.Shuffle = false }, saverOnly)
-		shC, _, shD := radio(95+seqW, y, "洗牌", func() bool { return cfg.Shuffle }, func() { cfg.Shuffle = true }, saverOnly)
+		// 位置依文字寬度計算（英文比中文寬）；中文維持原本的位置。
+		hdrW, _ := ui.Measure(i18n.T("圖樣", "Patterns"), 17)
+		x0 := max(95, colLabel+hdrW+14)
+		seqLabel, shLabel, sliceLabel := i18n.T("依序", "In order"), i18n.T("洗牌", "Shuffle"), i18n.T("每段", "Slice")
+		seqC, seqW, seqD := radio(x0, y, seqLabel, func() bool { return !cfg.Shuffle }, func() { cfg.Shuffle = false }, saverOnly)
+		shX := x0 + seqW
+		if i18n.Current() == i18n.EN {
+			shX -= 14 // 英文較寬：縮小兩個選項之間的距離
+		}
+		shC, _, shD := radio(shX, y, shLabel, func() bool { return cfg.Shuffle }, func() { cfg.Shuffle = true }, saverOnly)
+		shW, _ := ui.Measure(shLabel, 17)
+		sliceX := max(285, shX+24+shW+12)
+		sliceW, _ := ui.Measure(sliceLabel, 15)
+		selX := max(322, sliceX+sliceW+6)
+		selW := min(140, secondsColLeft-selX)
 		toggle := func() { cfg.Shuffle = !cfg.Shuffle }
 		items = append(items, item{
-			row: ui.Rect{X: 85, Y: y - 6, W: 190, H: 32}, left: toggle, right: toggle, activate: toggle,
+			row: ui.Rect{X: x0 - 10, Y: y - 6, W: max(190, shX+24+shW+8-(x0-10)), H: 32}, left: toggle, right: toggle, activate: toggle,
 			clicks: []clickArea{seqC, shC}, disabled: saverOnly,
 			draw: func(p *painter, _, _ bool) {
 				seqD(p)
@@ -270,11 +354,11 @@ func (m *menuScene) burnInItems(cfg *Config) []item {
 		off := saverOnly || !cfg.Shuffle
 		dec := func() { cfg.ShuffleSlice = step(shuffleSliceChoices, cfg.ShuffleSlice, -1) }
 		inc := func() { cfg.ShuffleSlice = step(shuffleSliceChoices, cfg.ShuffleSlice, 1) }
-		clicks, d := selector(322, y, 140, func() string { return shuffleSliceLabel(cfg.ShuffleSlice) }, dec, inc, off)
+		clicks, d := selector(selX, y, selW, func() string { return shuffleSliceLabel(cfg.ShuffleSlice) }, dec, inc, off)
 		items = append(items, item{
-			row: ui.Rect{X: 278, Y: y - 6, W: 188, H: 32}, left: dec, right: inc, clicks: clicks, disabled: off,
+			row: ui.Rect{X: sliceX - 7, Y: y - 6, W: selX + selW + 4 - (sliceX - 7), H: 32}, left: dec, right: inc, clicks: clicks, disabled: off,
 			draw: func(p *painter, _, _ bool) {
-				p.text("每段", 285, y+2, 15, dimColor(off), ui.Left)
+				p.text(sliceLabel, sliceX, y+2, 15, dimColor(off), ui.Left)
 				d(p)
 			},
 		})
@@ -327,13 +411,13 @@ func (m *menuScene) burnInItems(cfg *Config) []item {
 						cfg.TimerSeconds = min(n, MaxTimerSeconds)
 					}
 				},
-				hint: fmt.Sprintf("可直接輸入：90（分鐘）、10s（秒）、3m（分鐘）、3h（小時）、2:30（時:分）、1m30s，最長 %d 小時", MaxTimerSeconds/3600),
+				hint: fmt.Sprintf(i18n.T("可直接輸入：90（分鐘）、10s（秒）、3m（分鐘）、3h（小時）、2:30（時:分）、1m30s，最長 %d 小時", "Type a value: 90 (minutes), 10s (seconds), 3m (minutes), 3h (hours), 2:30 (h:mm), 1m30s; up to %d hours"), MaxTimerSeconds/3600),
 			},
 			draw: func(p *painter, focused, _ bool) {
-				p.text("播放時間", colLabel, y, 17, dimColor(saverOnly), ui.Left)
+				p.text(i18n.T("播放時間", "Play time"), colLabel, y, 17, dimColor(saverOnly), ui.Left)
 				d(p)
 				if focused {
-					p.text("可直接輸入", colValue+210, y+3, 13, ui.ColorDim, ui.Left)
+					p.text(i18n.T("可直接輸入", "type a value"), colValue+210, y+3, 13, ui.ColorDim, ui.Left)
 				}
 			},
 		})
@@ -364,7 +448,7 @@ func (m *menuScene) burnInItems(cfg *Config) []item {
 		items = append(items, item{
 			row: ui.Rect{X: 20, Y: y - 6, W: 960, H: 34}, left: cycle(-1), right: cycle(1), clicks: clicks, disabled: saverOnly,
 			draw: func(p *painter, _, _ bool) {
-				p.text("時間到後", colLabel, y, 17, dimColor(saverOnly), ui.Left)
+				p.text(i18n.T("時間到後", "When done"), colLabel, y, 17, dimColor(saverOnly), ui.Left)
 				for _, d := range draws {
 					d(p)
 				}
@@ -400,7 +484,7 @@ func (m *menuScene) burnInItems(cfg *Config) []item {
 			row: ui.Rect{X: 20, Y: y - 6, W: 430, H: 34}, left: cycleSaver(-1), right: cycleSaver(1), clicks: clicks,
 			preview: previewSaver,
 			draw: func(p *painter, _, _ bool) {
-				p.text("螢幕保護", colLabel, y, 17, ui.ColorDim, ui.Left)
+				p.text(i18n.T("螢幕保護", "Screensaver"), colLabel, y, 17, ui.ColorDim, ui.Left)
 				d(p)
 			},
 		})
@@ -414,15 +498,15 @@ func (m *menuScene) burnInItems(cfg *Config) []item {
 		}
 		exitClicks, exitDraw := selector(previewX, y, 200, func() string {
 			if cfg.SaverExit == SaverExitQuit {
-				return "關閉程式"
+				return i18n.T("關閉程式", "Quit")
 			}
-			return "回到選單"
+			return i18n.T("回到選單", "Back to menu")
 		}, toggleExit, toggleExit, false)
 		items = append(items, item{
 			row: ui.Rect{X: 460, Y: y - 6, W: 520, H: 34}, left: toggleExit, right: toggleExit, clicks: exitClicks,
 			preview: previewSaver,
 			draw: func(p *painter, _, _ bool) {
-				p.text("結束螢幕保護後", colRight, y, 17, ui.ColorDim, ui.Left)
+				p.text(i18n.T("結束螢幕保護後", "After screensaver"), colRight, y, 17, ui.ColorDim, ui.Left)
 				exitDraw(p)
 			},
 		})
@@ -433,7 +517,7 @@ func (m *menuScene) burnInItems(cfg *Config) []item {
 // shuffleSliceLabel 回傳洗牌每段長度的說明。
 func shuffleSliceLabel(sec int) string {
 	if sec == program.RandomSlice {
-		return fmt.Sprintf("%d–%d 秒", int(program.MinRandomSlice.Seconds()), int(program.MaxRandomSlice.Seconds()))
+		return fmt.Sprintf(i18n.T("%d–%d 秒", "%d–%d s"), int(program.MinRandomSlice.Seconds()), int(program.MaxRandomSlice.Seconds()))
 	}
 	return formatSeconds(sec)
 }
@@ -446,7 +530,7 @@ func infoBarRow(cfg *Config, y float64, disabled bool) item {
 	return item{
 		row: ui.Rect{X: 460, Y: y - 6, W: 520, H: 34}, left: dec, right: inc, clicks: clicks, disabled: disabled,
 		draw: func(p *painter, _, _ bool) {
-			p.text("資訊列", colRight, y, 17, dimColor(disabled), ui.Left)
+			p.text(i18n.T("資訊列", "Info bar"), colRight, y, 17, dimColor(disabled), ui.Left)
 			d(p)
 		},
 	}
@@ -512,8 +596,10 @@ func (m *menuScene) checkItems(cfg *Config) []item {
 				}
 			}
 		}
-		autoC, autoW, autoD := radio(250, 178, fmt.Sprintf("自動 %d 秒", DefaultCheckSeconds), func() bool { return allIs(DefaultCheckSeconds) }, setAll(DefaultCheckSeconds), false)
-		manC, _, manD := radio(250+autoW+12, 178, "手動", func() bool { return allIs(Manual) }, setAll(Manual), false)
+		autoC, autoW, autoD := radio(250, 178, fmt.Sprintf(i18n.T("自動 %d 秒", "Auto %d s"), DefaultCheckSeconds), func() bool { return allIs(DefaultCheckSeconds) }, setAll(DefaultCheckSeconds), false)
+		manLabel := i18n.T("手動", "Manual")
+		manC, _, manD := radio(250+autoW+12, 178, manLabel, func() bool { return allIs(Manual) }, setAll(Manual), false)
+		manW, _ := ui.Measure(manLabel, 17)
 		toggle := func() {
 			if allIs(DefaultCheckSeconds) {
 				setAll(Manual)()
@@ -522,9 +608,9 @@ func (m *menuScene) checkItems(cfg *Config) []item {
 			}
 		}
 		items = append(items, item{
-			row: ui.Rect{X: 168, Y: 172, W: 290, H: 32}, left: toggle, right: toggle, clicks: []clickArea{autoC, manC},
+			row: ui.Rect{X: 168, Y: 172, W: max(290, 250+autoW+12+24+manW+8-168), H: 32}, left: toggle, right: toggle, clicks: []clickArea{autoC, manC},
 			draw: func(p *painter, _, _ bool) {
-				p.text("全部設為", 180, 178, 15, ui.ColorDim, ui.Left)
+				p.text(i18n.T("全部設為", "Set all"), 180, 178, 15, ui.ColorDim, ui.Left)
 				autoD(p)
 				manD(p)
 			},
@@ -544,9 +630,9 @@ func (m *menuScene) checkItems(cfg *Config) []item {
 		desc := func() string { return shortDesc(ck.Description()) }
 		switch ck.(type) {
 		case *checks.GraySteps:
-			desc = func() string { return fmt.Sprintf("灰階分階 %d 階", cfg.GrayLevels) }
+			desc = func() string { return fmt.Sprintf(i18n.T("灰階分階 %d 階", "%d gray steps"), cfg.GrayLevels) }
 		case *checks.GrayField:
-			desc = func() string { return fmt.Sprintf("灰階 %d–%d", cfg.GrayMin, cfg.GrayMax) }
+			desc = func() string { return fmt.Sprintf(i18n.T("灰階 %d–%d", "Gray %d–%d"), cfg.GrayMin, cfg.GrayMax) }
 		}
 		items = append(items, listRow(i, it.Check, desc, &it.Enabled,
 			func() string { return checkSecondsLabel(it.Seconds, cfg.stepCount(ck)) },
@@ -569,9 +655,9 @@ func (m *menuScene) checkItems(cfg *Config) []item {
 		inc := func() { m.commitEdit(); cfg.GrayLevels = stepLevels(cfg.GrayLevels, 1) }
 		value := func() string {
 			if m.editKey == "levels" {
-				return m.editing + "▏ 階"
+				return m.editing + i18n.T("▏ 階", "▏ steps")
 			}
-			return fmt.Sprintf("%d 階", cfg.GrayLevels)
+			return fmt.Sprintf(i18n.T("%d 階", "%d steps"), cfg.GrayLevels)
 		}
 		clicks, d := selector(colValue, y, 200, value, dec, inc, false)
 		var preview func(*ebiten.Image, int)
@@ -588,13 +674,13 @@ func (m *menuScene) checkItems(cfg *Config) []item {
 						cfg.GrayLevels = checks.ClampGrayLevels(n)
 					}
 				},
-				hint: fmt.Sprintf("灰階分階可直接輸入 %d–%d；Enter 確定", checks.MinGrayLevels, checks.MaxGrayLevels),
+				hint: fmt.Sprintf(i18n.T("灰階分階可直接輸入 %d–%d；Enter 確定", "Gray steps: type %d–%d, Enter to confirm"), checks.MinGrayLevels, checks.MaxGrayLevels),
 			},
 			draw: func(p *painter, focused, _ bool) {
-				p.text("灰階分階", colLabel, y, 17, ui.ColorDim, ui.Left)
+				p.text(i18n.T("灰階分階", "Gray steps"), colLabel, y, 17, ui.ColorDim, ui.Left)
 				d(p)
 				if focused {
-					p.text(fmt.Sprintf("可直接輸入 %d–%d", checks.MinGrayLevels, checks.MaxGrayLevels), colValue+210, y+3, 13, ui.ColorDim, ui.Left)
+					p.text(fmt.Sprintf(i18n.T("可直接輸入 %d–%d", "type %d–%d"), checks.MinGrayLevels, checks.MaxGrayLevels), colValue+210, y+3, 13, ui.ColorDim, ui.Left)
 				}
 			},
 		})
@@ -606,10 +692,10 @@ func (m *menuScene) checkItems(cfg *Config) []item {
 	// 標記
 	{
 		y := rowBottom3
-		items = append(items, button(ui.Rect{X: colValue + 170, Y: y - 6, W: 150, H: 32}, "清除全部標記", false, func() { cfg.ClearMarks() }, cfg.MarkCount() == 0))
+		items = append(items, button(ui.Rect{X: colValue + 170, Y: y - 6, W: 150, H: 32}, i18n.T("清除全部標記", "Clear all marks"), false, func() { cfg.ClearMarks() }, cfg.MarkCount() == 0))
 		items[len(items)-1].draw = wrapDraw(items[len(items)-1].draw, func(p *painter) {
-			p.text("標記", colLabel, y, 17, ui.ColorDim, ui.Left)
-			p.text(fmt.Sprintf("已有 %d 個", cfg.MarkCount()), colValue, y, 17, ui.ColorText, ui.Left)
+			p.text(i18n.T("標記", "Marks"), colLabel, y, 17, ui.ColorDim, ui.Left)
+			p.text(fmt.Sprintf(i18n.T("已有 %d 個", "%d saved"), cfg.MarkCount()), colValue, y, 17, ui.ColorText, ui.Left)
 		})
 	}
 	return items
@@ -618,7 +704,7 @@ func (m *menuScene) checkItems(cfg *Config) []item {
 // grayFieldItems：灰階全畫面的最暗、最亮與手動階數，各自可以 ◀▶ 調整或直接輸入。
 func (m *menuScene) grayFieldItems(cfg *Config) []item {
 	y := rowBottom2
-	field := func(key, label string, x, w float64, get func() int, set func(int), lo, hi int,
+	field := func(key string, label i18n.Text, x, w float64, get func() int, set func(int), lo, hi int,
 		preview func(*ebiten.Image, int)) item {
 		apply := func(v int) {
 			set(v)
@@ -632,7 +718,7 @@ func (m *menuScene) grayFieldItems(cfg *Config) []item {
 			}
 			return strconv.Itoa(get())
 		}
-		lw, _ := ui.Measure(label, 15)
+		lw := fieldLabelW
 		clicks, d := selector(x+lw+8, y, w, value, dec, inc, false)
 		return item{
 			row: ui.Rect{X: x - 8, Y: y - 6, W: lw + w + 22, H: 34}, left: dec, right: inc, clicks: clicks, preview: preview,
@@ -644,10 +730,10 @@ func (m *menuScene) grayFieldItems(cfg *Config) []item {
 						apply(min(max(n, lo), hi))
 					}
 				},
-				hint: fmt.Sprintf("灰階全畫面的%s可直接輸入 %d–%d；Enter 確定", label, lo, hi),
+				hint: fmt.Sprintf(i18n.T("灰階全畫面的%s可直接輸入 %d–%d；Enter 確定", "Full-screen gray %s: type %d–%d, Enter to confirm"), label.String(), lo, hi),
 			},
 			draw: func(p *painter, _, _ bool) {
-				p.text(label, x, y+2, 15, ui.ColorDim, ui.Left)
+				p.text(label.String(), x, y+2, 15, ui.ColorDim, ui.Left)
 				d(p)
 			},
 		}
@@ -656,17 +742,17 @@ func (m *menuScene) grayFieldItems(cfg *Config) []item {
 	setMin := func(v int) { cfg.GrayMin, cfg.GrayMax = v, max(cfg.GrayMax, v) }
 	setMax := func(v int) { cfg.GrayMax, cfg.GrayMin = v, min(cfg.GrayMin, v) }
 	items := []item{
-		field("gmin", "最暗", colValue, 96, func() int { return cfg.GrayMin }, setMin, 0, 255,
+		field("gmin", i18n.Text{ZH: "最暗", EN: "Min"}, colValue, 96, func() int { return cfg.GrayMin }, setMin, 0, 255,
 			grayValuePreview(func() int { return cfg.GrayMin })),
-		field("gmax", "最亮", colValue+150, 96, func() int { return cfg.GrayMax }, setMax, 0, 255,
+		field("gmax", i18n.Text{ZH: "最亮", EN: "Max"}, colValue+150, 96, func() int { return cfg.GrayMax }, setMax, 0, 255,
 			grayValuePreview(func() int { return cfg.GrayMax })),
-		field("gn", "階數", colValue+300, 86, func() int { return cfg.GrayFieldN }, func(v int) { cfg.GrayFieldN = v },
+		field("gn", i18n.Text{ZH: "階數", EN: "Steps"}, colValue+300, 86, func() int { return cfg.GrayFieldN }, func(v int) { cfg.GrayFieldN = v },
 			checks.MinGrayFieldSteps, checks.MaxGrayFieldSteps, grayLevelsPreview(cfg)),
 	}
 	items[0].draw = wrapDraw(items[0].draw, func(p *painter) {
-		p.text("灰階全畫面", colLabel, y, 17, ui.ColorDim, ui.Left)
+		p.text(i18n.T("灰階全畫面", "Gray field"), colLabel, y, 17, ui.ColorDim, ui.Left)
 		g := checks.GrayField{Min: cfg.GrayMin, Max: cfg.GrayMax, N: cfg.GrayFieldN}
-		p.text(fmt.Sprintf("階（實際 %d 階）　%.1f%%–%.1f%%", len(g.Levels()), float64(cfg.GrayMin)*100/255, float64(cfg.GrayMax)*100/255),
+		p.text(fmt.Sprintf(i18n.T("階（實際 %d 階）　%.1f%%–%.1f%%", "(actual %d)   %.1f%%–%.1f%%"), len(g.Levels()), float64(cfg.GrayMin)*100/255, float64(cfg.GrayMax)*100/255),
 			colValue+300+40+86+8, y+3, 14, ui.ColorDim, ui.Left)
 	})
 	return items
@@ -681,10 +767,10 @@ func wrapDraw(f func(*painter, bool, bool), extra func(*painter)) func(*painter,
 
 func checkSecondsLabel(sec, steps int) string {
 	if sec == Manual {
-		return "手動"
+		return i18n.T("手動", "Manual")
 	}
 	if steps > 1 {
-		return fmt.Sprintf("%d 秒×%d", sec, steps)
+		return fmt.Sprintf(i18n.T("%d 秒×%d", "%d s×%d"), sec, steps)
 	}
 	return formatSeconds(sec)
 }
@@ -739,16 +825,16 @@ func formatTimer(sec int) string {
 	h, m, s := sec/3600, sec/60%60, sec%60
 	var parts []string
 	if h > 0 {
-		parts = append(parts, fmt.Sprintf("%d 小時", h))
+		parts = append(parts, fmt.Sprintf(i18n.T("%d 小時", "%d h"), h))
 	}
 	switch {
 	case m > 0 && h == 0 && s == 0:
-		parts = append(parts, fmt.Sprintf("%d 分鐘", m))
+		parts = append(parts, fmt.Sprintf(i18n.T("%d 分鐘", "%d min"), m))
 	case m > 0 || h > 0 && s > 0:
-		parts = append(parts, fmt.Sprintf("%d 分", m))
+		parts = append(parts, fmt.Sprintf(i18n.T("%d 分", "%d min"), m))
 	}
 	if s > 0 || len(parts) == 0 {
-		parts = append(parts, fmt.Sprintf("%d 秒", s))
+		parts = append(parts, fmt.Sprintf(i18n.T("%d 秒", "%d s"), s))
 	}
 	return strings.Join(parts, " ")
 }
@@ -813,12 +899,12 @@ func (m *menuScene) start(a *App) {
 	switch a.cfg.Mode {
 	case ModeBurnIn:
 		if len(a.cfg.Program()) == 0 {
-			m.errMsg = "請至少勾選一個圖樣"
+			m.errMsg = i18n.T("請至少勾選一個圖樣", "Select at least one pattern.")
 			return
 		}
 	case ModeCheck:
 		if len(a.cfg.CheckSequence()) == 0 {
-			m.errMsg = "請至少勾選一個檢查項目"
+			m.errMsg = i18n.T("請至少勾選一個檢查項目", "Select at least one test item.")
 			return
 		}
 	}
@@ -966,20 +1052,19 @@ func (m *menuScene) Draw(a *App, screen *ebiten.Image) {
 	}
 
 	p.text("go-screen-burn-in-fixer", colLabel, 22, 24, ui.ColorText, ui.Left)
-	p.text("設定", 960, 28, 17, ui.ColorDim, ui.Right)
 	p.fill(ui.Rect{X: 20, Y: 62, W: 960, H: 1}, ui.ColorBorder)
 
 	cfg := &a.cfg
 	switch cfg.Mode {
 	case ModeCheck:
-		p.text("檢查項目", colLabel, 178, 17, ui.ColorDim, ui.Left)
-		p.text("每階秒數", secondsX+75, 180, 15, ui.ColorDim, ui.Center)
+		p.text(i18n.T("檢查項目", "Tests"), colLabel, 178, 17, ui.ColorDim, ui.Left)
+		p.text(i18n.T("每階秒數", "Per step"), secondsX+75, 180, 15, ui.ColorDim, ui.Center)
 	default:
 		hdr := dimColor(cfg.Mode == ModeScreensaver)
-		p.text("圖樣", colLabel, 178, 17, hdr, ui.Left)
-		col := "每段秒數"
+		p.text(i18n.T("圖樣", "Patterns"), colLabel, 178, 17, hdr, ui.Left)
+		col := i18n.T("每段秒數", "Duration")
 		if cfg.Shuffle {
-			col = "每輪秒數"
+			col = i18n.T("每輪秒數", "Per round")
 		}
 		p.text(col, secondsX+75, 180, 15, hdr, ui.Center)
 	}
@@ -1003,9 +1088,9 @@ func (m *menuScene) Draw(a *App, screen *ebiten.Image) {
 	switch cfg.Mode {
 	case ModeBurnIn:
 		total := cfg.Program().Total()
-		sum := fmt.Sprintf("一輪合計 %s，共 %d 個圖樣", formatDuration(total), len(cfg.Program()))
+		sum := fmt.Sprintf(i18n.T("一輪合計 %s，共 %d 個圖樣", "One round %s, %d patterns"), formatDuration(total), len(cfg.Program()))
 		if cfg.Shuffle {
-			sum += "，洗牌"
+			sum += i18n.T("，洗牌", ", shuffled")
 		}
 		p.text(sum, previewX, 432, 15, ui.ColorDim, ui.Left)
 	case ModeCheck:
@@ -1014,9 +1099,9 @@ func (m *menuScene) Draw(a *App, screen *ebiten.Image) {
 	if m.errMsg != "" {
 		p.text(m.errMsg, colLabel, 652, 17, ui.ColorError, ui.Left)
 	}
-	hint, hintColor := "↑↓ 選擇　←→ 調整　空白鍵 勾選", color.Color(ui.ColorBorder)
+	hint, hintColor := i18n.T("↑↓ 選擇　←→ 調整　空白鍵 勾選", "↑↓ select   ←→ adjust   Space toggle"), color.Color(ui.ColorBorder)
 	if cfg.Mode == ModeCheck {
-		hint = "檢查時：Enter／空白鍵 下一階　← 上一階　Esc 取消　點一下 標記　右鍵拖曳 調整灰階"
+		hint = i18n.T("檢查時：Enter／空白鍵 下一階　← 上一階　Esc 取消　點一下 標記　右鍵拖曳 調整灰階", "During tests: Enter / Space next   ← previous   Esc cancel   click mark   right-drag adjust gray")
 	}
 	if e := items[focus].edit; e != nil && !items[focus].disabled {
 		hint, hintColor = e.hint, ui.ColorDim
@@ -1035,12 +1120,12 @@ const (
 	hintLineH = 18.0
 )
 
-// wrapText 把文字依寬度換行，優先在標點（、，；）與全形空白之後斷開。
+// wrapText 把文字依寬度換行，在標點（、，；）、全形空白與半形空白之後斷開。
 func wrapText(s string, size, maxW float64) []string {
 	var segs []string
 	start := 0
 	for i, r := range s {
-		if strings.ContainsRune("、，；　", r) {
+		if strings.ContainsRune("、，；　 ", r) {
 			end := i + len(string(r))
 			segs = append(segs, s[start:end])
 			start = end
@@ -1053,13 +1138,13 @@ func wrapText(s string, size, maxW float64) []string {
 	cur := ""
 	for _, seg := range segs {
 		if w, _ := ui.Measure(cur+seg, size); cur != "" && w > maxW {
-			lines = append(lines, strings.TrimRight(cur, "　"))
-			cur = strings.TrimLeft(seg, "　")
+			lines = append(lines, strings.TrimRight(cur, "　 "))
+			cur = strings.TrimLeft(seg, "　 ")
 			continue
 		}
 		cur += seg
 	}
-	return append(lines, strings.TrimRight(cur, "　"))
+	return append(lines, strings.TrimRight(cur, "　 "))
 }
 
 // checkSummary 回傳檢查流程的總時間說明。
@@ -1082,9 +1167,9 @@ func checkSummary(seq []CheckStep) string {
 			total += checks.RetentionPatternSeconds * time.Second
 		}
 	}
-	s := fmt.Sprintf("共 %d 階，自動約 %s", steps, formatDuration(total))
+	s := fmt.Sprintf(i18n.T("共 %d 階，自動約 %s", "%d steps, about %s automatic"), steps, formatDuration(total))
 	if manual > 0 {
-		s += fmt.Sprintf("，手動 %d 階", manual)
+		s += fmt.Sprintf(i18n.T("，手動 %d 階", ", %d manual"), manual)
 	}
 	return s
 }

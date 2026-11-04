@@ -8,6 +8,7 @@ import (
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
 
+	"github.com/The78estHerry/go-screen-burn-in-fixer/internal/i18n"
 	"github.com/The78estHerry/go-screen-burn-in-fixer/internal/ui"
 )
 
@@ -171,22 +172,46 @@ func scaleFor(w, h int) (s, ox, oy float64) {
 
 func formatSeconds(sec int) string {
 	if sec >= 60 && sec%60 == 0 {
-		return fmt.Sprintf("%d 分", sec/60)
+		return fmt.Sprintf(i18n.T("%d 分", "%d min"), sec/60)
 	}
-	return fmt.Sprintf("%d 秒", sec)
+	return fmt.Sprintf(i18n.T("%d 秒", "%d s"), sec)
 }
 
-// shortDesc 縮短說明，讓清單列不會太長：括號內的「寬 N 像素」改成「N px」，其餘括號內容省略。
+// 清單列說明文字的大小與寬度上限（說明從 colLabel+175 開始，到秒數選擇器之前）。
+const (
+	descSize = 14
+	descMaxW = secondsX - (colLabel + 175) - 12
+)
+
+// shortDesc 縮短說明，讓清單列不會太長：括號內的寬度（「寬 N 像素」、"N px wide"）改成「N px」，
+// 其餘括號內容省略；放不下時依實際寬度截斷並加上「…」。
 func shortDesc(s string) string {
-	base, paren, _ := strings.Cut(s, "（")
+	base, paren, ok := strings.Cut(s, "（")
+	if !ok {
+		base, paren, _ = strings.Cut(s, " (")
+	}
 	suffix := ""
 	var n int
 	if _, err := fmt.Sscanf(paren, "寬 %d 像素", &n); err == nil {
 		suffix = fmt.Sprintf(" %d px", n)
+	} else if _, err := fmt.Sscanf(paren, "%d px", &n); err == nil {
+		suffix = fmt.Sprintf(" %d px", n)
 	}
-	r := []rune(base)
-	if max := 12 - len([]rune(suffix)); len(r) > max {
-		r = append(r[:max-1], '…')
+	return fitText(base, suffix, descSize, descMaxW)
+}
+
+// fitText 回傳「s＋suffix」；寬度超過 maxW 時從 s 的尾端截斷並加上「…」（suffix 保留）。
+func fitText(s, suffix string, size, maxW float64) string {
+	if w, _ := ui.Measure(s+suffix, size); w <= maxW {
+		return s + suffix
 	}
-	return string(r) + suffix
+	r := []rune(s)
+	for len(r) > 0 {
+		r = r[:len(r)-1]
+		t := strings.TrimRight(string(r), " ,、，") + "…"
+		if w, _ := ui.Measure(t+suffix, size); w <= maxW {
+			return t + suffix
+		}
+	}
+	return "…" + suffix
 }

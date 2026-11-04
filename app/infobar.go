@@ -7,6 +7,7 @@ import (
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
 
+	"github.com/The78estHerry/go-screen-burn-in-fixer/internal/i18n"
 	"github.com/The78estHerry/go-screen-burn-in-fixer/internal/ui"
 )
 
@@ -54,13 +55,19 @@ func (b *infoBar) visible() bool {
 		(b.setting == InfoAlways && !b.alwaysOff) || time.Now().Before(b.until)
 }
 
-// draw 在畫面左上角繪製資訊列：第一行亮色，其餘為暗色。
+// draw 在畫面左上角繪製資訊列：第一行亮色，其餘為暗色。比螢幕寬的行自動換行（英文比中文長）。
 func (b *infoBar) draw(screen *ebiten.Image, lines ...string) {
 	if !b.visible() || len(lines) == 0 {
 		return
 	}
 	s := math.Max(float64(screen.Bounds().Dy())/1080, 0.6) // 以 1080p 為基準縮放
 	size, small := 22*s, 17.6*s
+	maxW := float64(screen.Bounds().Dx()) - 64*s
+	wrapped := lines[:1:1]
+	for _, l := range lines[1:] {
+		wrapped = append(wrapped, wrapText(l, small, maxW)...)
+	}
+	lines = wrapped
 	w := 0.0
 	for i, l := range lines {
 		sz := small
@@ -89,9 +96,9 @@ func (b *infoBar) draw(screen *ebiten.Image, lines ...string) {
 func infoBarLabel(v int) string {
 	switch v {
 	case InfoHidden:
-		return "不顯示"
+		return i18n.T("不顯示", "Off")
 	case InfoAlways:
-		return "一直顯示"
+		return i18n.T("一直顯示", "Always")
 	}
 	return formatSeconds(v)
 }

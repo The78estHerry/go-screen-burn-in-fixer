@@ -32,6 +32,7 @@ import (
 
 	"github.com/hajimehoshi/ebiten/v2"
 
+	"github.com/The78estHerry/go-screen-burn-in-fixer/internal/i18n"
 	"github.com/The78estHerry/go-screen-burn-in-fixer/program"
 )
 
@@ -113,7 +114,7 @@ func (a *App) startChildren(mode Mode, base program.Program, timer time.Duration
 // childArgs 回傳子程式的參數：播放內容全部以參數傳入，不依賴設定檔（帶參數執行時設定檔可能與這次不同）。
 func (a *App) childArgs(mode Mode, monitor int, base program.Program, timer time.Duration) []string {
 	args := []string{"-child", string(mode), "-monitor", strconv.Itoa(monitor + 1),
-		"-screensaver", a.cfg.Screensaver, "-info-bar", strconv.Itoa(a.cfg.InfoBar)}
+		"-screensaver", a.cfg.Screensaver, "-info-bar", strconv.Itoa(a.cfg.InfoBar), "-lang", string(i18n.Current())}
 	if a.opts.Windowed {
 		args = append(args, "-windowed")
 	}

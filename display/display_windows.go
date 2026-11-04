@@ -8,6 +8,8 @@ import (
 	"unsafe"
 
 	"golang.org/x/sys/windows"
+
+	"github.com/The78estHerry/go-screen-burn-in-fixer/internal/i18n"
 	"golang.org/x/sys/windows/registry"
 )
 
@@ -140,7 +142,7 @@ func queryDisplayConfig() ([]pathInfo, []modeInfo, error) {
 		var nPath, nMode uint32
 		if r, _, _ := procGetDisplayConfigBufferSizes.Call(qdcOnlyActivePaths,
 			uintptr(unsafe.Pointer(&nPath)), uintptr(unsafe.Pointer(&nMode))); r != 0 {
-			return nil, nil, fmt.Errorf("GetDisplayConfigBufferSizes 失敗: %w", windows.Errno(r))
+			return nil, nil, fmt.Errorf(i18n.T("GetDisplayConfigBufferSizes 失敗: %w", "GetDisplayConfigBufferSizes failed: %w"), windows.Errno(r))
 		}
 		if nPath == 0 {
 			return nil, nil, nil
@@ -154,11 +156,11 @@ func queryDisplayConfig() ([]pathInfo, []modeInfo, error) {
 			continue
 		}
 		if r != 0 {
-			return nil, nil, fmt.Errorf("QueryDisplayConfig 失敗: %w", windows.Errno(r))
+			return nil, nil, fmt.Errorf(i18n.T("QueryDisplayConfig 失敗: %w", "QueryDisplayConfig failed: %w"), windows.Errno(r))
 		}
 		return paths[:nPath], modes[:nMode], nil
 	}
-	return nil, nil, fmt.Errorf("QueryDisplayConfig 失敗: %w", windows.ERROR_INSUFFICIENT_BUFFER)
+	return nil, nil, fmt.Errorf(i18n.T("QueryDisplayConfig 失敗: %w", "QueryDisplayConfig failed: %w"), windows.ERROR_INSUFFICIENT_BUFFER)
 }
 
 func getDeviceInfo(p unsafe.Pointer) error {
@@ -173,7 +175,7 @@ func getDeviceInfo(p unsafe.Pointer) error {
 func readEDID(devicePath string) ([]byte, error) {
 	parts := strings.Split(strings.TrimPrefix(devicePath, `\\?\`), "#")
 	if len(parts) < 3 {
-		return nil, fmt.Errorf("無法解析顯示器裝置路徑: %q", devicePath)
+		return nil, fmt.Errorf(i18n.T("無法解析顯示器裝置路徑: %q", "cannot parse display device path: %q"), devicePath)
 	}
 	key, err := registry.OpenKey(registry.LOCAL_MACHINE,
 		`SYSTEM\CurrentControlSet\Enum\DISPLAY\`+parts[1]+`\`+parts[2]+`\Device Parameters`, registry.QUERY_VALUE)

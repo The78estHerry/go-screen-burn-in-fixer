@@ -1,12 +1,13 @@
 package display
 
 import (
-	"errors"
 	"fmt"
+
+	"github.com/The78estHerry/go-screen-burn-in-fixer/internal/i18n"
 )
 
 // ErrUnsupported 代表目前平台不支援讀取顯示器資訊。
-var ErrUnsupported = errors.New("目前平台不支援讀取顯示器資訊")
+var ErrUnsupported error = i18n.Error{ZH: "目前平台不支援讀取顯示器資訊", EN: "reading display information is not supported on this platform"}
 
 // Display 是作業系統回報的一個使用中顯示器。
 type Display struct {
@@ -21,13 +22,13 @@ type Display struct {
 func (d Display) Label() string {
 	s := d.Current.String()
 	if d.FriendlyName != "" {
-		s = d.FriendlyName + "　" + s
+		s = d.FriendlyName + i18n.T("　", " ") + s
 	}
 	if d.EDID != nil {
-		s += fmt.Sprintf("（EDID 原生 %d×%d）", d.EDID.Native.Width, d.EDID.Native.Height)
+		s += fmt.Sprintf(i18n.T("（EDID 原生 %d×%d）", " (EDID native %d×%d)"), d.EDID.Native.Width, d.EDID.Native.Height)
 	}
 	if d.Primary {
-		s += "［主螢幕］"
+		s += i18n.T("［主螢幕］", " [primary]")
 	}
 	return s
 }

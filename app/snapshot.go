@@ -11,14 +11,18 @@ import (
 	"github.com/hajimehoshi/ebiten/v2"
 
 	"github.com/The78estHerry/go-screen-burn-in-fixer/actions"
+	"github.com/The78estHerry/go-screen-burn-in-fixer/display"
+	"github.com/The78estHerry/go-screen-burn-in-fixer/internal/i18n"
 	"github.com/The78estHerry/go-screen-burn-in-fixer/program"
 )
 
 // Snapshot 把各個畫面畫到離屏影像並存成 PNG（開發用）。不需要操作滑鼠鍵盤，
-// 也不會切換全螢幕，用來檢查版面與文字。
+// 也不會切換全螢幕，用來檢查版面與文字。兩種語言各存一份：<dir>/en/、<dir>/zh/。
 func Snapshot(opts Options, dir string) error {
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return err
+	for _, l := range []i18n.Lang{i18n.EN, i18n.ZH} {
+		if err := os.MkdirAll(filepath.Join(dir, string(l)), 0o755); err != nil {
+			return err
+		}
 	}
 	g := &snapshotGame{a: &App{opts: opts, cfg: opts.Config}, dir: dir}
 	if err := ebiten.RunGame(g); err != nil {
@@ -45,7 +49,7 @@ func (g *snapshotGame) Update() error {
 	a.frame = 90
 
 	menu := newMenuScene(a)
-	menu.focus = 4 // 第一個圖樣列（前面是模式、螢幕、順序、每段長度）：預覽框顯示 gray-noise
+	menu.focus = 5 // 第一個圖樣列（前面是語言、模式、螢幕、順序、每段長度）：預覽框顯示 gray-noise
 
 	// 洗牌播放的資訊列（顯示這個圖樣在這一輪已播放的時間）。
 	play := newPlayScene(program.Shuffle(a.cfg.Program(), program.RandomSlice, 1, a.cfg.Timer()), a.cfg.Timer(), InfoAlways)
@@ -62,7 +66,7 @@ func (g *snapshotGame) Update() error {
 	checkCfg.CheckItems[3].Seconds = Manual
 	checkCfg.MonitorMarks = map[string][]Mark{a.playKey(): {{X: 300, Y: 260}, {X: 720, Y: 480}}}
 	checkMenu := newMenuScene(a)
-	checkMenu.focus = 2 // 「全部設為」：檢查反白範圍不會蓋住文字
+	checkMenu.focus = 3 // 「全部設為」：檢查反白範圍不會蓋住文字
 	check := newCheckScene(checkCfg.CheckSequence()[3:4], InfoAlways)
 	check.lastCursor = [2]int{560, 400}
 	check.cursorUntil = time.Now().Add(time.Minute)
@@ -73,13 +77,13 @@ func (g *snapshotGame) Update() error {
 
 	// 多螢幕的選單：加上兩個假的螢幕示範勾選框，並選擇洗牌（只畫選單，不會真的播放）。
 	multiMons := append(append([]monitor(nil), a.monitors...),
-		monitor{short: "2：DELL U2720Q 3840×2160", tiny: "2：3840×2160", key: "fake-2"},
-		monitor{short: "3：LG 27GR95QE 2560×1440", tiny: "3：2560×1440", key: "fake-3"})
+		monitor{n: 2, w: 3840, h: 2160, disp: &display.Display{FriendlyName: "DELL U2720Q"}, key: "fake-2"},
+		monitor{n: 3, w: 2560, h: 1440, disp: &display.Display{FriendlyName: "LG 27GR95QE"}, key: "fake-3"})
 	multiCfg := a.cfg
 	multiCfg.Monitors = []int{0, 2}
 	multiCfg.Shuffle = true
 	multiMenu := newMenuScene(a)
-	multiMenu.focus = 16 // 播放時間：示範直接輸入
+	multiMenu.focus = 17 // 播放時間：示範直接輸入
 	multiMenu.editKey, multiMenu.editing = "timer", "2:30"
 
 	shots := []struct {
@@ -101,21 +105,26 @@ func (g *snapshotGame) Update() error {
 	}
 	img := ebiten.NewImage(WindowWidth, WindowHeight)
 	pix := make([]byte, 4*WindowWidth*WindowHeight)
-	for _, s := range shots {
-		orig, origMons := a.cfg, a.monitors
-		a.cfg = s.cfg
-		if s.mons != nil {
-			a.monitors = s.mons
+	defer i18n.Set(i18n.Current())
+	for _, l := range []i18n.Lang{i18n.EN, i18n.ZH} {
+		i18n.Set(l)
+		for _, s := range shots {
+			orig, origMons := a.cfg, a.monitors
+			a.cfg = s.cfg
+			if s.mons != nil {
+				a.monitors = s.mons
+			}
+			img.Clear()
+			s.scene.Draw(a, img)
+			a.cfg, a.monitors = orig, origMons
+			img.ReadPixels(pix)
+			path := filepath.Join(g.dir, string(l), s.name+".png")
+			if err := savePNG(path, pix); err != nil {
+				g.err = err
+				return ebiten.Termination
+			}
+			fmt.Println(path)
 		}
-		img.Clear()
-		s.scene.Draw(a, img)
-		a.cfg, a.monitors = orig, origMons
-		img.ReadPixels(pix)
-		if err := savePNG(filepath.Join(g.dir, s.name+".png"), pix); err != nil {
-			g.err = err
-			return ebiten.Termination
-		}
-		fmt.Println(filepath.Join(g.dir, s.name+".png"))
 	}
 	return nil
 }

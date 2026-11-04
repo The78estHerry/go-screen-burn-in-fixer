@@ -5,8 +5,6 @@
 [繁體中文](README.md) | **English** | [日本語](README.ja.md)
 
 > The Traditional Chinese README is the primary version. If this translation differs from it, the Chinese version is correct.
->
-> **The program's interface is currently in Traditional Chinese only.** Menu labels below are given as the Chinese text followed by an English translation, e.g. 「開始播放」(Start).
 
 [![Sponsor](https://img.shields.io/badge/Sponsor-GitHub%20Sponsors-ea4aaa?logo=githubsponsors&logoColor=white)](https://github.com/sponsors/The78estHerry)
 
@@ -120,14 +118,18 @@ Requires a graphical desktop (X11, or XWayland under Wayland) and OpenGL, includ
 
 1. Run `go-screen-burn-in-fixer.exe`.
 2. Read the warning screen and press any key.
-3. In the settings menu choose a mode: 「Burn-In 修復」(burn-in repair), 「檢查畫面」(test screens) or 「只播螢幕保護」(screensaver only), then tick the monitors and items to use. The item under the mouse is previewed live on the right.
-4. Press 「開始播放」(Start) / 「開始檢查」(Start test) or Enter to play full screen on the selected monitors. Settings are saved to `go-screen-burn-in-fixer.json` next to the exe and reused next time.
+3. In the settings menu choose a mode: **Burn-in repair**, **Test screens** or **Screensaver only**, then tick the monitors and items to use. The item under the mouse is previewed live on the right.
+4. Press **Start** / **Start test** or Enter to play full screen on the selected monitors. Settings are saved to `go-screen-burn-in-fixer.json` next to the exe and reused next time.
 
 The settings menu can be used entirely from the keyboard: ↑↓ select, ←→ adjust, Space toggle, Enter start, Esc quit.
 
+### Interface language
+
+The interface is available in **English** and **Traditional Chinese**; English is the default. Click "English | 中文" in the top right of the settings menu to switch (or press ↑ to move to the top and use ←→). All text changes immediately and the choice is saved in the settings file. On the command line, use `-lang en` or `-lang zh`.
+
 ### Multiple monitors
 
-With more than one monitor, 「螢幕」(Monitors) in the settings menu has a checkbox for each monitor; every ticked monitor plays full screen at the same time (←→ select a monitor, Space toggle).
+With more than one monitor, **Monitors** in the settings menu has a checkbox for each monitor; every ticked monitor plays full screen at the same time (←→ select a monitor, Space toggle).
 
 - All monitors share the same timer and end together; pressing Esc on any monitor stops all of them.
 - Pause, pattern changes and test steps are synchronized across all monitors.
@@ -138,16 +140,16 @@ Technically, the first ticked monitor is played by the main program and each oth
 
 ### Shuffle
 
-When 「洗牌」(Shuffle) is chosen next to 「圖樣」(Patterns), each pattern's time is cut into short slices interleaved with the other patterns, e.g. gray-noise for 40 s, vstripes for 25 s, then moving-bar… and back to gray-noise.
+When **Shuffle** is chosen next to **Patterns**, each pattern's time is cut into short slices interleaved with the other patterns, e.g. gray-noise for 40 s, vstripes for 25 s, then moving-bar… and back to gray-noise.
 
 - The seconds for each pattern in the list become **the total time per round**; shuffling does not change the total.
-- 「每段」(Slice) can be random 15–60 s (default) or fixed 10, 20, 30, 60 s.
+- **Slice** can be random 15–60 s (default) or fixed 10, 20, 30, 60 s.
 - The same pattern never plays twice in a row; when the playback time is longer than one round, every round is shuffled again. If one pattern takes more than half of a round, its slices get longer so it can still be interleaved.
-- The info bar shows how long the pattern has played in this round, e.g. 「gray-noise　本輪 3:20 / 10:00」(this round 3:20 / 10:00).
+- The info bar shows how long the pattern has played in this round, e.g. "gray-noise   this round 3:20 / 10:00".
 
 ### Playback time
 
-「播放時間」(Playback time) can be set with ◀▶ to common values (10 s, 30 s, 1 min, 5 min up to 24 h), or typed in directly when the row is selected, up to 72 hours. A number without a unit means minutes:
+**Play time** can be set with ◀▶ to common values (10 s, 30 s, 1 min, 5 min up to 24 h), or typed in directly when the row is selected, up to 72 hours. A number without a unit means minutes:
 
 | Input | Meaning |
 |---|---|
@@ -173,12 +175,12 @@ Press Enter to confirm, Esc to cancel.
 ### Test screens
 
 - Tick the items to test; they run in order. For items with several steps (e.g. near-black has 4), the seconds are per step.
-- Each item can be set to a number of seconds (5–120) or 「手動」(manual: press Enter / Space to go to the next step). 「全部設為」(Set all) at the top sets every item to automatic 10 s or manual at once.
+- Each item can be set to a number of seconds (5–120) or **Manual** (press Enter / Space to go to the next step). **Set all** at the top sets every item to automatic 10 s or manual at once.
 - The number of gray steps can be switched with ◀▶ (8, 16, 32, 64, 128, 256), or typed in (2–256) when the row is selected.
 - **gray-field** has darkest and brightest values (0–255, default 13 and 191) and a number of steps (4–15, default 7); each field can be typed in when selected.
   - Darkest to brightest is divided evenly into n steps: in automatic mode each step is shown for the set time, in manual mode press Enter to advance. The number of steps never exceeds the gray levels in the range (e.g. 3–4 has only 2 steps; darkest equal to brightest has 1).
   - During the test, **drag left / right with the right mouse button** to adjust the gray level (left darker, right brighter; the full screen width equals darkest to brightest). Dragging switches the item to manual; after that Enter jumps to the next step brighter than the current level.
-  - The info bar shows the gray value, percentage and step, e.g. 「灰階 128（50.2%）　第 4/7 階」(gray 128 (50.2%), step 4/7).
+  - The info bar shows the gray value, percentage and step, e.g. "Gray 128 (50.2%)   item 1/8, step 4/7".
 - After all items finish, or Esc is pressed, you return to the test menu.
 
 | Key | Action |
@@ -197,13 +199,13 @@ Marks are saved and kept the next time, so you can check the same spot again aft
 
 ### Info bar
 
-「資訊列」(Info bar) in the settings menu controls the info bar in the top left during playback and tests (shared by both modes):
+**Info bar** in the settings menu controls the info bar in the top left during playback and tests (shared by both modes):
 
 | Setting | Behavior |
 |---|---|
-| 不顯示 (Off) | Hidden; appears only while S is held or after pressing H |
-| 3 / 5 / 10 秒 (seconds) | Shown for that many seconds when the pattern or step changes or the mouse moves (default 5 s) |
-| 一直顯示 (Always) | Always shown |
+| Off | Hidden; appears only while S is held or after pressing H |
+| 3 / 5 / 10 s | Shown for that many seconds when the pattern or step changes or the mouse moves (default 5 s) |
+| Always | Always shown |
 
 ### Timer and action at the end
 
@@ -234,6 +236,7 @@ go-screen-burn-in-fixer.exe -monitor all -shuffle -timer 1h -after sleep
 | `-monitor` | Monitors to use (from 1): `2`, `1,2` or `all` |
 | `-shuffle` | Shuffle playback |
 | `-shuffle-slice` | Seconds per slice when shuffling; `0` means random 15–60 s |
+| `-lang` | Interface language: `en` (English, default) or `zh` (Traditional Chinese) |
 | `-list` | List all patterns and screensavers |
 | `-list-monitors` | List monitors (current resolution and EDID native resolution) |
 | `-windowed` | Run in a window |

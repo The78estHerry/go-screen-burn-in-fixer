@@ -9,6 +9,8 @@ import (
 	"time"
 
 	"github.com/The78estHerry/go-screen-burn-in-fixer/patterns"
+
+	"github.com/The78estHerry/go-screen-burn-in-fixer/internal/i18n"
 )
 
 // DefaultSegment 是每個圖樣預設播放的時間。
@@ -46,19 +48,19 @@ func Parse(s string) (Program, error) {
 		}
 		name, secs, ok := strings.Cut(item, ":")
 		if !ok {
-			return nil, fmt.Errorf("節目表格式錯誤 %q：應為 圖樣:秒數", item)
+			return nil, fmt.Errorf(i18n.T("節目表格式錯誤 %q：應為 圖樣:秒數", "invalid program item %q: expected pattern:seconds"), item)
 		}
 		if _, ok := patterns.Get(name); !ok {
-			return nil, fmt.Errorf("沒有名為 %q 的圖樣", name)
+			return nil, fmt.Errorf(i18n.T("沒有名為 %q 的圖樣", "no pattern named %q"), name)
 		}
 		n, err := strconv.ParseFloat(secs, 64)
 		if err != nil || n <= 0 {
-			return nil, fmt.Errorf("圖樣 %s 的秒數無效：%q", name, secs)
+			return nil, fmt.Errorf(i18n.T("圖樣 %s 的秒數無效：%q", "invalid seconds for pattern %s: %q"), name, secs)
 		}
 		p = append(p, Segment{Pattern: name, Duration: time.Duration(n * float64(time.Second))})
 	}
 	if len(p) == 0 {
-		return nil, errors.New("節目表是空的")
+		return nil, errors.New(i18n.T("節目表是空的", "the program is empty"))
 	}
 	return p, nil
 }

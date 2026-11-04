@@ -3,6 +3,8 @@ package checks
 import (
 	"slices"
 	"testing"
+
+	"github.com/The78estHerry/go-screen-burn-in-fixer/internal/i18n"
 )
 
 func TestGrayFieldLevels(t *testing.T) {
@@ -39,7 +41,31 @@ func TestClampGrayField(t *testing.T) {
 }
 
 func TestGrayLabel(t *testing.T) {
-	if got := GrayLabel(128); got != "灰階 128（50.2%）" {
-		t.Errorf("GrayLabel(128) = %q", got)
+	defer i18n.Set(i18n.Current())
+	for l, want := range map[i18n.Lang]string{i18n.ZH: "灰階 128（50.2%）", i18n.EN: "Gray 128 (50.2%)"} {
+		i18n.Set(l)
+		if got := GrayLabel(128); got != want {
+			t.Errorf("%s：GrayLabel(128) = %q，預期 %q", l, got, want)
+		}
+	}
+}
+
+// 每個檢查項目在兩種語言下都有說明、提示與各階名稱，英文不可以混入中文。
+func TestChecksTranslated(t *testing.T) {
+	defer i18n.Set(i18n.Current())
+	i18n.Set(i18n.EN)
+	for _, c := range All() {
+		texts := append([]string{c.Description(), c.Hint()}, c.Steps()...)
+		for _, s := range texts {
+			if s == "" {
+				t.Errorf("%s：有空白的文字", c.Name())
+			}
+			for _, r := range s {
+				if r >= 0x4e00 && r <= 0x9fff {
+					t.Errorf("%s：英文介面出現中文 %q", c.Name(), s)
+					break
+				}
+			}
+		}
 	}
 }

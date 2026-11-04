@@ -9,6 +9,8 @@ import (
 	"unsafe"
 
 	"golang.org/x/sys/windows"
+
+	"github.com/The78estHerry/go-screen-burn-in-fixer/internal/i18n"
 )
 
 var (
@@ -60,7 +62,7 @@ func shutdown() error {
 		return err
 	}
 	if err := windows.ExitWindowsEx(ewxShutdown|ewxPowerOff, shtdnReasonMajorOther|shtdnReasonFlagPlanned); err != nil {
-		return fmt.Errorf("關機失敗: %w", err)
+		return fmt.Errorf(i18n.T("關機失敗: %w", "shutdown failed: %w"), err)
 	}
 	return nil
 }
@@ -68,18 +70,18 @@ func shutdown() error {
 func enableShutdownPrivilege() error {
 	var token windows.Token
 	if err := windows.OpenProcessToken(windows.CurrentProcess(), windows.TOKEN_ADJUST_PRIVILEGES|windows.TOKEN_QUERY, &token); err != nil {
-		return fmt.Errorf("無法開啟程序權杖: %w", err)
+		return fmt.Errorf(i18n.T("無法開啟程序權杖: %w", "cannot open process token: %w"), err)
 	}
 	defer token.Close()
 	var id windows.LUID
 	name, _ := windows.UTF16PtrFromString("SeShutdownPrivilege")
 	if err := windows.LookupPrivilegeValue(nil, name, &id); err != nil {
-		return fmt.Errorf("無法查詢關機權限: %w", err)
+		return fmt.Errorf(i18n.T("無法查詢關機權限: %w", "cannot look up shutdown privilege: %w"), err)
 	}
 	tp := windows.Tokenprivileges{PrivilegeCount: 1}
 	tp.Privileges[0] = windows.LUIDAndAttributes{Luid: id, Attributes: windows.SE_PRIVILEGE_ENABLED}
 	if err := windows.AdjustTokenPrivileges(token, false, &tp, uint32(unsafe.Sizeof(tp)), nil, nil); err != nil {
-		return fmt.Errorf("無法取得關機權限: %w", err)
+		return fmt.Errorf(i18n.T("無法取得關機權限: %w", "cannot get shutdown privilege: %w"), err)
 	}
 	return nil
 }
@@ -87,7 +89,7 @@ func enableShutdownPrivilege() error {
 func sleep() error {
 	// SetSuspendState(bHibernate=FALSE, bForce=FALSE, bWakeupEventsDisabled=FALSE)
 	if r, _, err := procSetSuspendState.Call(0, 0, 0); r == 0 {
-		return fmt.Errorf("進入睡眠失敗: %w", err)
+		return fmt.Errorf(i18n.T("進入睡眠失敗: %w", "sleep failed: %w"), err)
 	}
 	return nil
 }

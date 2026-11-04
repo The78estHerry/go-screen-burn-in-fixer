@@ -13,6 +13,7 @@ import (
 	"github.com/hajimehoshi/ebiten/v2/vector"
 
 	"github.com/The78estHerry/go-screen-burn-in-fixer/checks"
+	"github.com/The78estHerry/go-screen-burn-in-fixer/internal/i18n"
 )
 
 // 移動滑鼠後十字游標顯示的時間。
@@ -292,13 +293,13 @@ func nextLevel(levels []int, v, dir int) (int, bool) {
 func grayPosition(levels []int, v int) string {
 	for i, l := range levels {
 		if l == v {
-			return fmt.Sprintf("第 %d/%d 階", i+1, len(levels))
+			return fmt.Sprintf(i18n.T("第 %d/%d 階", "step %d/%d"), i+1, len(levels))
 		}
 		if l > v && i > 0 {
-			return fmt.Sprintf("第 %d–%d/%d 階之間", i, i+1, len(levels))
+			return fmt.Sprintf(i18n.T("第 %d–%d/%d 階之間", "between steps %d–%d/%d"), i, i+1, len(levels))
 		}
 	}
-	return fmt.Sprintf("第 %d/%d 階", len(levels), len(levels))
+	return fmt.Sprintf(i18n.T("第 %d/%d 階", "step %d/%d"), len(levels), len(levels))
 }
 
 // toggleMark 在游標位置新增標記；點在既有標記上則移除它。
@@ -342,26 +343,28 @@ func (s *checkScene) Draw(a *App, screen *ebiten.Image) {
 	}
 
 	steps := st.Check.Steps()
-	line1 := fmt.Sprintf("%s（項目 %d/%d，第 %d/%d 階）", steps[st.Step], st.Index+1, st.Items, st.Step+1, len(steps))
+	line1 := fmt.Sprintf(i18n.T("%s（項目 %d/%d，第 %d/%d 階）", "%s (item %d/%d, step %d/%d)"), steps[st.Step], st.Index+1, st.Items, st.Step+1, len(steps))
 	if isGray {
-		line1 = fmt.Sprintf("%s　項目 %d/%d，%s", checks.GrayLabel(s.gray.value), st.Index+1, st.Items,
+		line1 = fmt.Sprintf(i18n.T("%s　項目 %d/%d，%s", "%s   item %d/%d, %s"), checks.GrayLabel(s.gray.value), st.Index+1, st.Items,
 			grayPosition(g.Levels(), s.gray.value))
 	}
 	if d := s.stepDuration(); d > 0 {
-		line1 += "　剩餘 " + formatDuration(d-time.Since(s.stepStart))
+		line1 += fmt.Sprintf(i18n.T("　剩餘 %s", "   %s left"), formatDuration(d-time.Since(s.stepStart)))
 	} else {
-		line1 += "　手動：按 Enter／空白鍵 繼續"
+		line1 += i18n.T("　手動：按 Enter／空白鍵 繼續", "   manual: press Enter / Space to continue")
 	}
 	lines := []string{line1}
 	if sv, ok := st.Check.(checks.Statuser); ok {
 		lines = append(lines, sv.Status(st.Step, t))
 	}
-	keys := "Enter／空白鍵 下一階　← 上一階　Esc 取消　點一下 標記／取消標記　C 清除標記　M 隱藏標記　H 資訊列　按住 S 顯示"
+	keys := i18n.T("Enter／空白鍵 下一階　← 上一階　Esc 取消　點一下 標記／取消標記　C 清除標記　M 隱藏標記　H 資訊列　按住 S 顯示",
+		"Enter / Space next   ← previous   Esc cancel   click mark / unmark   C clear marks   M hide marks   H info bar   hold S show")
 	if isGray {
-		keys = "Enter／空白鍵 下一階　← 上一階　右鍵拖曳 調整灰階（切換成手動）　Esc 取消　點一下 標記　C 清除標記　M 隱藏標記　H 資訊列"
+		keys = i18n.T("Enter／空白鍵 下一階　← 上一階　右鍵拖曳 調整灰階（切換成手動）　Esc 取消　點一下 標記　C 清除標記　M 隱藏標記　H 資訊列",
+			"Enter / Space next   ← previous   right-drag adjust gray (switches to manual)   Esc cancel   click mark   C clear marks   M hide marks   H info bar")
 	}
 	lines = append(lines, st.Check.Hint(),
-		fmt.Sprintf("座標 (%d, %d)　標記 %d 個", s.lastCursor[0], s.lastCursor[1], len(a.marks())), keys)
+		fmt.Sprintf(i18n.T("座標 (%d, %d)　標記 %d 個", "position (%d, %d)   %d marks"), s.lastCursor[0], s.lastCursor[1], len(a.marks())), keys)
 	s.info.draw(screen, lines...)
 }
 

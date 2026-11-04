@@ -10,6 +10,8 @@ import (
 	"golang.org/x/image/font/gofont/goregular"
 
 	"github.com/The78estHerry/go-screen-burn-in-fixer/internal/gfx"
+
+	"github.com/The78estHerry/go-screen-burn-in-fixer/internal/i18n"
 )
 
 //go:embed aurora.kage
@@ -20,16 +22,17 @@ const Speed = 5.0
 
 func init() {
 	Register(driftClock{})
-	Register(&shaderSaver{name: "aurora", desc: "流動的深色漸層色帶", shader: gfx.NewShader("aurora", auroraSrc)})
+	Register(&shaderSaver{name: "aurora", desc: i18n.Text{ZH: "流動的深色漸層色帶", EN: "Flowing dark gradient bands"}, shader: gfx.NewShader("aurora", auroraSrc)})
 }
 
 type shaderSaver struct {
-	name, desc string
-	shader     *gfx.Shader
+	name   string
+	desc   i18n.Text
+	shader *gfx.Shader
 }
 
 func (s *shaderSaver) Name() string        { return s.name }
-func (s *shaderSaver) Description() string { return s.desc }
+func (s *shaderSaver) Description() string { return s.desc.String() }
 
 func (s *shaderSaver) Draw(dst *ebiten.Image, st State) {
 	s.shader.Draw(dst, map[string]any{
@@ -54,8 +57,10 @@ func mustFontSource() *text.GoTextFaceSource {
 	return s
 }
 
-func (driftClock) Name() string        { return "drift-clock" }
-func (driftClock) Description() string { return "在整個螢幕漂移、慢慢變色的時鐘" }
+func (driftClock) Name() string { return "drift-clock" }
+func (driftClock) Description() string {
+	return i18n.T("在整個螢幕漂移、慢慢變色的時鐘", "A clock drifting across the screen, slowly changing color")
+}
 
 func (driftClock) Draw(dst *ebiten.Image, st State) {
 	dst.Fill(colorBlack)

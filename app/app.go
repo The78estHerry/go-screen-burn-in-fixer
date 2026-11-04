@@ -14,6 +14,7 @@ import (
 
 	"github.com/The78estHerry/go-screen-burn-in-fixer/actions"
 	"github.com/The78estHerry/go-screen-burn-in-fixer/display"
+	"github.com/The78estHerry/go-screen-burn-in-fixer/internal/i18n"
 	"github.com/The78estHerry/go-screen-burn-in-fixer/program"
 )
 
@@ -42,14 +43,35 @@ type scene interface {
 	Draw(a *App, screen *ebiten.Image)
 }
 
-// monitor 是選單中可選擇的螢幕。
+// monitor 是選單中可選擇的螢幕。說明文字在繪製時才產生（切換語言後立刻改變）。
 type monitor struct {
-	m     *ebiten.MonitorType
-	label string // 完整說明（只有一個螢幕時顯示）
-	short string // 簡短說明（多個螢幕並排時顯示）
-	tiny  string // 最短的說明：編號與解析度（螢幕名稱放不下時）
-	key   string // 識別字串：標記依此分開儲存
+	m    *ebiten.MonitorType
+	n    int              // 編號（從 1 開始）
+	w, h int              // 解析度（裝置像素）
+	disp *display.Display // 作業系統回報的顯示器；對應不到時為 nil
+	key  string           // 識別字串：標記依此分開儲存
 }
+
+func (mon monitor) prefix() string { return fmt.Sprintf(i18n.T("%d：", "%d: "), mon.n) }
+
+// label 是完整說明（只有一個螢幕時顯示）。
+func (mon monitor) label() string {
+	if mon.disp != nil {
+		return mon.prefix() + mon.disp.Label()
+	}
+	return mon.tiny()
+}
+
+// short 是簡短說明（多個螢幕並排時顯示）。
+func (mon monitor) short() string {
+	if mon.disp != nil && mon.disp.FriendlyName != "" {
+		return fmt.Sprintf("%s%s %d×%d", mon.prefix(), mon.disp.FriendlyName, mon.w, mon.h)
+	}
+	return mon.tiny()
+}
+
+// tiny 是最短的說明：編號與解析度（螢幕名稱放不下時）。
+func (mon monitor) tiny() string { return fmt.Sprintf("%s%d×%d", mon.prefix(), mon.w, mon.h) }
 
 // App 實作 ebiten.Game。
 type App struct {
@@ -133,16 +155,12 @@ func (a *App) refreshMonitors() {
 		w, h := m.Size()
 		s := m.DeviceScaleFactor()
 		pw, ph := int(float64(w)*s+0.5), int(float64(h)*s+0.5)
-		mon := monitor{m: m, label: fmt.Sprintf("%d：%d×%d", i+1, pw, ph), key: monitorKey(i, "")}
-		mon.short, mon.tiny = mon.label, mon.label
+		mon := monitor{m: m, n: i + 1, w: pw, h: ph, key: monitorKey(i, "")}
 		// Ebitengine 與作業系統都把主螢幕排在第一個；依序找解析度相同、尚未對應的顯示器。
 		for j, d := range ds {
 			if !used[j] && d.Current.Width == pw && d.Current.Height == ph {
 				used[j] = true
-				mon.label = fmt.Sprintf("%d：%s", i+1, d.Label())
-				if d.FriendlyName != "" {
-					mon.short = fmt.Sprintf("%d：%s %d×%d", i+1, d.FriendlyName, pw, ph)
-				}
+				mon.disp = &ds[j]
 				mon.key = monitorKey(i, d.DeviceName+" "+d.FriendlyName)
 				break
 			}
