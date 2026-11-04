@@ -272,7 +272,7 @@ go build -trimpath -ldflags "-s -w -H windowsgui" -o dist/go-screen-burn-in-fixe
 - [x] 主程式（選單、定時、後續動作、螢幕偵測、EDID、字型）
 - [x] 上傳 Gitea
 - [x] 準備公開到 GitHub（0.3.2：module 路徑、三語 README、FUNDING.yml、RELEASING.md）
-- [x] 贊助改成只用 PayPal（2026-11-04：GitHub Sponsors 不支援台灣；README 三語與 FUNDING.yml，樣式見 gitea-to-github 的 readme-style.md；v0.3.2 的 Release 說明兩邊也改成 PayPal）
+- [x] 贊助只用 PayPal（2026-11-04：README 三語、FUNDING.yml、RELEASING.md、STATUS.md、v0.3.2 的 Release 說明兩邊；樣式見 gitea-to-github 的 readme-style.md。不要用 GitHub Sponsors：不支援台灣）
 - [x] 檢查模式（預覽已確認、選單、手動 / 自動、灰階分階、標記、資訊列設定）
 - [x] v0.1.0 Release（附 exe）
 - [x] 多螢幕同時播放、洗牌播放（第 12 節）
