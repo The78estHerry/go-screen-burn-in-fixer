@@ -1,15 +1,12 @@
 # 工作狀態
 
-> 最後更新：2026-10-29。下次開工時先讀這份檔案，提醒使用者做到哪裡、哪些還需要確認。
+> 最後更新：2026-11-04。下次開工時先讀這份檔案，提醒使用者做到哪裡、哪些還需要確認。
 
 ## 目前進度
 
 最新版本 **v0.4.0**，Release 附 Windows / macOS（Apple Silicon、Intel）/ Linux x64 四個檔案。
 
-**0.3.2 起主要放在 GitHub**（公開）：https://github.com/The78estHerry/go-screen-burn-in-fixer ；Gitea（私人）同步一份。v0.1.0～v0.3.1 的 Release 只在 Gitea。
-
-- 2026-11-04：main 與全部 tag 推上 GitHub；使用者實測 0.3.2 通過後發佈 **v0.3.2**（GitHub Release id 433618822、Gitea id 19），兩邊下載比對 SHA-256 一致。
-- 2026-11-04：發佈 **v0.4.0**（英文介面，見下方）。
+**0.3.2 起主要放在 GitHub**（公開）：https://github.com/The78estHerry/go-screen-burn-in-fixer ；Gitea（私人）同步一份，兩邊都推、都發 Release（步驟見 [RELEASING.md](RELEASING.md)，`tools/release/publish.py` 一次完成）。v0.1.0～v0.3.1 的 Release 只在 Gitea。
 
 | 版本 | 內容 |
 |---|---|
@@ -17,25 +14,32 @@
 | v0.2.0 | 多螢幕同時播放、洗牌播放、播放時間直接輸入、EDID 擴充區塊、exe 圖示與版本資訊、選單反白修正 |
 | v0.2.1 | macOS 與 Linux 版本、播放結束後選單回到原本的螢幕 |
 | v0.3.0 | 灰階全畫面：可設定最暗／最亮／階數、右鍵拖曳調整灰階、資訊列顯示數值與百分比 |
-| v0.4.0 | 英文介面：預設英文，警告畫面與選單右上角切換英文／中文、`-lang`；警告畫面與 README 加上使用風險自負的免責說明 |
-| v0.3.2 | 第一次在 GitHub 發佈：module 路徑、三語 README 與圖示、著作權人 The78ester、GitHub Sponsors；功能同 v0.3.1 |
 | v0.3.1 | 播放時間可選 10 秒–1 分鐘並可輸入秒數（`10s`、`3m`、`3h`）、倒數與提示文字呼吸效果、選單提示自動換行 |
+| v0.3.2 | 第一次在 GitHub 發佈：module 路徑、三語 README 與圖示、著作權人 The78ester、GitHub Sponsors；功能同 v0.3.1 |
+| v0.4.0 | 英文介面：預設英文，警告畫面與選單右上角切換英文／中文、`-lang`；警告畫面與 README 加上使用風險自負的免責說明 |
 
-功能都已實作，自動測試（`go vet`、`go test`）與能在單一螢幕上做的流程測試都通過。**目前沒有進行中、做到一半的工作。** **Windows 的實機確認已全部完成**，只剩 macOS 與 Ubuntu。
+功能都已實作，自動測試（`go vet`、`go test`）與能在單一螢幕上做的流程測試都通過。**目前沒有進行中、做到一半的工作**，main 與兩邊 remote 同步、工作目錄乾淨。**Windows 的實機確認已全部完成**（含 0.4.0 英文介面），只剩 macOS 與 Ubuntu。
+
+### 2026-11-04 工作紀錄
+- **公開到 GitHub**（比照 go-virtual-display）：檢查歷史沒有機密 → 使用者決定歷史原封不動推上去；module 路徑改成 `github.com/The78estHerry/go-screen-burn-in-fixer`、README 加英文／日文版與圖示、贊助徽章放在 README 最前面、LICENSE 著作權人改 The78ester、新增 `.github/FUNDING.yml` 與 `RELEASING.md`。
+- 第一次推 GitHub 403：新 repo 要加進 fine-grained token 的 Repository access（使用者已加）。
+- **v0.3.2**（GitHub id 433618822、Gitea id 19）：功能同 v0.3.1，第一次在 GitHub 發佈。
+- **v0.4.0**（GitHub id 433649310、Gitea id 20）：英文介面，預設英文。
+  - `internal/i18n`：畫面文字寫成 `T("中文", "English")`，約 180 個字串；`log` 維持中文。規則見 CLAUDE.md 第 13 節。
+  - 英文版面：圖樣列與「全部設為」依文字寬度排列、清單說明依寬度截斷、資訊列自動換行；中文版面不變。`-snapshot` 輸出 en／zh 兩份。
+  - 使用者追加：警告畫面與 README 加上「使用風險自負」的免責說明；警告畫面右上角也能切換語言（← → 也可以），底下用兩種語言寫「← →  Language / 語言」。
+- 這次的經驗整理在 `C:/WorkapceAI/gitea-to-github`（Gitea 私人 repo），全域 CLAUDE.md 也加了指向它的規則：`rules.md`（開工提醒、一開始就支援英文、語言切換要從第一個畫面就能用）、`checklist.md`、`pitfalls.md`、`readme-style.md`（README 統一樣式、免責說明）。
 
 ### 2026-10-29 工作紀錄
 - 使用者在 Windows 實機確認 v0.2.1 的全部項目（全螢幕、多螢幕、EDID、選單、洗牌、真的關機／睡眠）。
 - **v0.3.0**：灰階全畫面改成可設定最暗／最亮（0–255）與階數（4–15）、右鍵拖曳調整（拖曳後切換成手動）、資訊列顯示「灰階 128（50.2%）　第 4/7 階」。曾試過自動模式連續漸進，使用者試用後要求改回分階前進。
 - **v0.3.1**：播放時間可選 10 秒／30 秒／1 分鐘並可輸入秒數；倒數與提示文字加上呼吸效果（使用者很在意烙印，之後新增會停留的文字也要套用）；選單提示自動換行。
 
-### 0.4.0：英文介面（2026-11-04 發佈，GitHub Release id 433649310、Gitea id 20，兩邊下載比對 SHA-256 一致）
-- 介面可切換英文／繁體中文，**預設英文**；選單右上角「English | 中文」，`-lang en|zh`。約 180 個字串，`log` 維持中文。
-- 英文版面：圖樣列與「全部設為」依文字寬度排列、清單說明依寬度截斷、資訊列自動換行。中文版面不變。
-- 自動測試、`-snapshot`（兩種語言）、`-list`、視窗模式流程與多螢幕（`-monitor 1,1 -lang zh`）都通過。
-
 ### 下次可以做
 - macOS（Apple Silicon、Intel）、Ubuntu（X11、Wayland）實機測試，見下方清單。
 - macOS／Linux 讀取螢幕名稱與 EDID；兩台相同解析度螢幕的對應問題（見「已知限制」）。
+- GitHub repo 頁面的 About（說明、網站、topics），讓別人搜尋得到（還沒跟使用者討論）。
+- `-dry-run` 倒數結束後，即使是帶參數執行也會回到選單（不會自動結束）；是 0.4.0 以前就有的行為，要不要改成直接結束可以問使用者。
 
 ## 需要使用者實機確認
 
