@@ -38,4 +38,5 @@ token 一律用 `git credential fill` 取得，不要印出來、不要寫進檔
 | 版本 | 日期 | Release 位置 | 內容 |
 |---|---|---|---|
 | 0.1.0～0.3.1 | 2026-10-28～29 | Gitea | 見 STATUS.md |
+| 0.4.0 | 2026-11-04 | GitHub（id 433649310）、Gitea（id 20） | 英文介面（預設英文，警告畫面與選單右上角切換）、`-lang`、使用風險自負的免責說明 |
 | 0.3.2 | 2026-11-04 | GitHub（id 433618822）、Gitea（id 19） | 第一次在 GitHub 發佈：module 路徑改成 GitHub、README 加英文／日文版與圖示、著作權人改為 The78ester、啟用 GitHub Sponsors。功能和 0.3.1 相同 |
