@@ -8,9 +8,9 @@
 >
 > **プログラムの画面は英語と繁体字中国語です（日本語はありません）。** 以下ではメニューの表示を英語の原文で示します。
 
-[![Sponsor](https://img.shields.io/badge/Sponsor-GitHub%20Sponsors-ea4aaa?logo=githubsponsors&logoColor=white)](https://github.com/sponsors/The78estHerry)
+[![PayPal](https://img.shields.io/badge/PayPal-paypal.me%2FThe78ester-00457C?logo=paypal&logoColor=white)](https://paypal.me/The78ester)
 
-💖 このツールが役に立った場合は、[GitHub Sponsors](https://github.com/sponsors/The78estHerry) から開発を支援していただけるとうれしいです。
+💖 このツールが役に立った場合は、[PayPal](https://paypal.me/The78ester) から開発を支援していただけるとうれしいです。
 
 「画面修復パターン」をリアルタイムで全画面表示する小さなツールです。高速に点滅するノイズ、カラーのストライプ、単色の切り替え、移動するバーによって、パネル上の赤・緑・青のサブピクセルひとつひとつを全点灯と全消灯の間で繰り返し切り替えます。再生が終わったら、プログラムを終了する、シャットダウンする、スリープする、またはゆっくり動く暗いスクリーンセーバーに切り替えることができます。
 
@@ -292,4 +292,4 @@ go run ./cmd/preview
 
 埋め込みフォント Noto Sans TC（サブセット）は [SIL Open Font License 1.1](internal/ui/NotoSansTC-LICENSE.txt) です。
 
-このツールが役に立った場合は、開発への支援（スポンサー）を歓迎します：[GitHub Sponsors](https://github.com/sponsors/The78estHerry)（リポジトリページ上部の「Sponsor」ボタン）。
+このツールが役に立った場合は、開発への支援（スポンサー）を歓迎します：[PayPal](https://paypal.me/The78ester)。

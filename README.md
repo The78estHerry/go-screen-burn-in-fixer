@@ -4,9 +4,9 @@
 
 **繁體中文** | [English](README.en.md) | [日本語](README.ja.md)
 
-[![Sponsor](https://img.shields.io/badge/Sponsor-GitHub%20Sponsors-ea4aaa?logo=githubsponsors&logoColor=white)](https://github.com/sponsors/The78estHerry)
+[![PayPal](https://img.shields.io/badge/PayPal-paypal.me%2FThe78ester-00457C?logo=paypal&logoColor=white)](https://paypal.me/The78ester)
 
-💖 如果這個工具對你有幫助，歡迎透過 [GitHub Sponsors](https://github.com/sponsors/The78estHerry) 贊助支持開發。
+💖 如果這個工具對你有幫助，歡迎透過 [PayPal](https://paypal.me/The78ester) 贊助支持開發。
 
 在全螢幕即時播放「螢幕修復畫面」的小工具：快速閃爍的雜訊、彩色條紋、純色輪播與移動色條，讓面板上每個紅、綠、藍子像素在全亮與全暗之間反覆切換。播放結束後可以自動關閉程式、關機、睡眠，或切換成節奏緩慢的螢幕保護畫面。
 
@@ -290,6 +290,6 @@ go run ./cmd/preview
 
 本專案採用 [MIT License](LICENSE)。
 
-如果這個工具對你有幫助，歡迎贊助支持開發：[GitHub Sponsors](https://github.com/sponsors/The78estHerry)（repo 頁面上方的「Sponsor」按鈕）。
+如果這個工具對你有幫助，歡迎透過 [PayPal](https://paypal.me/The78ester) 贊助支持開發。
 
 內嵌字型 Noto Sans TC（子集）採用 [SIL Open Font License 1.1](internal/ui/NotoSansTC-LICENSE.txt)。
