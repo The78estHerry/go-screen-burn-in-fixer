@@ -8,6 +8,10 @@
 >
 > **The program's interface is currently in Traditional Chinese only.** Menu labels below are given as the Chinese text followed by an English translation, e.g. 「開始播放」(Start).
 
+[![Sponsor](https://img.shields.io/badge/Sponsor-GitHub%20Sponsors-ea4aaa?logo=githubsponsors&logoColor=white)](https://github.com/sponsors/The78estHerry)
+
+💖 If this tool helps you, please consider supporting development via [GitHub Sponsors](https://github.com/sponsors/The78estHerry).
+
 A small tool that plays "screen repair" patterns full screen in real time: fast-flashing noise, colored stripes, solid color cycles and moving bars, so that every red, green and blue subpixel on the panel is switched between fully on and fully off again and again. When playback ends it can quit, shut down, sleep, or switch to a slow, dark screensaver.
 
 It also includes **test screens**: gray levels, single colors, near-black, gradients, full black / white and an image retention test, to find burn-in, temporary image retention, dead pixels and uniformity problems.
@@ -282,4 +286,4 @@ This project is licensed under the [MIT License](LICENSE).
 
 The embedded font Noto Sans TC (subset) is licensed under the [SIL Open Font License 1.1](internal/ui/NotoSansTC-LICENSE.txt).
 
-If this tool helps you, you can support it through [GitHub Sponsors](https://github.com/sponsors/The78estHerry).
+If this tool helps you, sponsorship to support development is welcome via [GitHub Sponsors](https://github.com/sponsors/The78estHerry) (the "Sponsor" button at the top of the repo page).

@@ -8,6 +8,10 @@
 >
 > **プログラムの画面は現在、繁体字中国語のみです。** 以下ではメニューの表示を「開始播放」（再生開始）のように、中国語の原文と日本語訳で示します。
 
+[![Sponsor](https://img.shields.io/badge/Sponsor-GitHub%20Sponsors-ea4aaa?logo=githubsponsors&logoColor=white)](https://github.com/sponsors/The78estHerry)
+
+💖 このツールが役に立った場合は、[GitHub Sponsors](https://github.com/sponsors/The78estHerry) から開発を支援していただけるとうれしいです。
+
 「画面修復パターン」をリアルタイムで全画面表示する小さなツールです。高速に点滅するノイズ、カラーのストライプ、単色の切り替え、移動するバーによって、パネル上の赤・緑・青のサブピクセルひとつひとつを全点灯と全消灯の間で繰り返し切り替えます。再生が終わったら、プログラムを終了する、シャットダウンする、スリープする、またはゆっくり動く暗いスクリーンセーバーに切り替えることができます。
 
 さらに**チェック画面**も内蔵しています。グレー、単色、黒に近い色、グラデーション、全黒・全白、残像テストで、焼き付き、一時的な残像、ドット抜け、ムラを見つけられます。
@@ -282,4 +286,4 @@ go run ./cmd/preview
 
 埋め込みフォント Noto Sans TC（サブセット）は [SIL Open Font License 1.1](internal/ui/NotoSansTC-LICENSE.txt) です。
 
-このツールが役に立ったら、[GitHub Sponsors](https://github.com/sponsors/The78estHerry) で支援していただけるとうれしいです。
+このツールが役に立った場合は、開発への支援（スポンサー）を歓迎します：[GitHub Sponsors](https://github.com/sponsors/The78estHerry)（リポジトリページ上部の「Sponsor」ボタン）。
