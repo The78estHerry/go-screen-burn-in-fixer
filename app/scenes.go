@@ -29,11 +29,31 @@ func uiScale(screen *ebiten.Image) (s, ox, oy float64) {
 
 // ── 警告畫面 ─────────────────────────────────────────────
 
+// 警告畫面右上角也有語言切換（使用者指定）：第一次開啟時還沒辦法到選單切換，看不懂英文的人
+// 也要能先切成中文再讀警告。點語言、按 ← → 只切換語言，不會離開警告畫面。
 type warningScene struct{}
 
 func (warningScene) Update(a *App) error {
 	if inpututil.IsKeyJustPressed(ebiten.KeyEscape) {
 		return ebiten.Termination
+	}
+	lang := langSwitch(&a.cfg, nil)
+	if inpututil.IsKeyJustPressed(ebiten.KeyLeft) || inpututil.IsKeyJustPressed(ebiten.KeyRight) {
+		lang.left()
+		return nil
+	}
+	if inpututil.IsMouseButtonJustPressed(ebiten.MouseButtonLeft) {
+		s, ox, oy := scaleFor(a.screenW, a.screenH)
+		cx, cy := ebiten.CursorPosition()
+		mx, my := (float64(cx)-ox)/s, (float64(cy)-oy)/s
+		if lang.row.Contains(mx, my) {
+			for _, c := range lang.clicks {
+				if c.r.Contains(mx, my) {
+					c.fn()
+				}
+			}
+			return nil
+		}
 	}
 	if anyInput() {
 		a.goMenu()
@@ -46,6 +66,7 @@ func (warningScene) Draw(a *App, screen *ebiten.Image) {
 	s, ox, oy := uiScale(screen)
 	cx := ox + WindowWidth/2*s
 	f := breathNow()
+	langSwitch(&a.cfg, nil).draw(&painter{dst: screen, s: s, ox: ox, oy: oy}, false, false)
 	ui.Text(screen, i18n.T("⚠ 警告", "⚠ Warning"), cx, oy+150*s, 44*s, dimmed(ui.ColorWarning, f), ui.Center)
 	lines := []string{
 		"本程式內含快速閃爍的畫面。",
@@ -78,6 +99,8 @@ func (warningScene) Draw(a *App, screen *ebiten.Image) {
 	// 「按任意鍵」放在說明下方（英文行數較多，跟著往下）。
 	hintY := max(560, top+float64(len(lines)-1)*lineH+62)
 	ui.Text(screen, i18n.T("按任意鍵或點一下繼續　　Esc 結束", "Press any key or click to continue        Esc to quit"), cx, oy+hintY*s, 20*s, dimmed(ui.ColorDim, f), ui.Center)
+	// 語言切換的說明固定兩種語言都寫，看不懂目前語言的人也知道怎麼切換。
+	ui.Text(screen, "← →  Language / 語言", cx, oy+(hintY+36)*s, 16*s, dimmed(ui.ColorDim, f), ui.Center)
 }
 
 // ── 播放 Burn-In ─────────────────────────────────────────

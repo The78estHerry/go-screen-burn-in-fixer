@@ -126,7 +126,7 @@ The settings menu can be used entirely from the keyboard: ↑↓ select, ←→ 
 
 ### Interface language
 
-The interface is available in **English** and **Traditional Chinese**; English is the default. Click "English | 中文" in the top right of the settings menu to switch (or press ↑ to move to the top and use ←→). All text changes immediately and the choice is saved in the settings file. On the command line, use `-lang en` or `-lang zh`.
+The interface is available in **English** and **Traditional Chinese**; English is the default. Click "English | 中文" in the top right of the first warning screen or of the settings menu to switch (on the warning screen ← → also work; in the menu press ↑ to move to the top, then ←→). All text changes immediately and the choice is saved in the settings file. On the command line, use `-lang en` or `-lang zh`.
 
 ### Multiple monitors
 

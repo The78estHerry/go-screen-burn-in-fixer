@@ -121,9 +121,13 @@ func (m *menuScene) modeRow(cfg *Config) item {
 	}
 }
 
-// langRow：右上角的語言切換「English | 中文」。點一下切換；鍵盤 ↑ 移到最上面後 ←→ 切換。
-// 切換後畫面上所有文字立刻改變（文字都在繪製時才決定）。
-func (m *menuScene) langRow(cfg *Config) item {
+// langRow：選單右上角的語言切換。鍵盤 ↑ 移到最上面後 ←→ 切換。
+func (m *menuScene) langRow(cfg *Config) item { return langSwitch(cfg, m.cancelEdit) }
+
+// langSwitch：右上角的語言切換「English | 中文」，選單與警告畫面共用。點一下切換，
+// 切換後畫面上所有文字立刻改變（文字都在繪製時才決定），選擇存在 cfg.Lang。
+// before 在切換前呼叫（選單用來放棄正在輸入的數值），可以是 nil。
+func langSwitch(cfg *Config, before func()) item {
 	const y = 28.0
 	langs := []struct {
 		lang  i18n.Lang
@@ -139,7 +143,9 @@ func (m *menuScene) langRow(cfg *Config) item {
 	}
 	set := func(l i18n.Lang) func() {
 		return func() {
-			m.cancelEdit()
+			if before != nil {
+				before()
+			}
 			i18n.Set(l)
 			cfg.Lang = string(l)
 		}
