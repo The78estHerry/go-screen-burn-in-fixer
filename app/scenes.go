@@ -54,6 +54,8 @@ func (warningScene) Draw(a *App, screen *ebiten.Image) {
 		"",
 		"OLED 烙印是永久性的面板老化，無法用任何畫面修復；",
 		"本工具可能有助於減輕暫時性殘影或喚醒卡住的像素，但不保證有效。",
+		"",
+		"使用風險自負，作者不對螢幕損壞或其他後果負責。",
 	}
 	if i18n.Current() == i18n.EN {
 		lines = []string{
@@ -64,12 +66,18 @@ func (warningScene) Draw(a *App, screen *ebiten.Image) {
 			"OLED burn-in is permanent panel aging and cannot be fixed by any image.",
 			"This tool may help reduce temporary image retention or wake stuck pixels,",
 			"but there is no guarantee.",
+			"",
+			"Use at your own risk. The author is not responsible",
+			"for any damage to your display or other consequences.",
 		}
 	}
+	const top, lineH = 240.0, 36.0
 	for i, l := range lines {
-		ui.Text(screen, l, cx, oy+(250+float64(i)*38)*s, 22*s, dimmed(ui.ColorText, f), ui.Center)
+		ui.Text(screen, l, cx, oy+(top+float64(i)*lineH)*s, 22*s, dimmed(ui.ColorText, f), ui.Center)
 	}
-	ui.Text(screen, i18n.T("按任意鍵或點一下繼續　　Esc 結束", "Press any key or click to continue        Esc to quit"), cx, oy+560*s, 20*s, dimmed(ui.ColorDim, f), ui.Center)
+	// 「按任意鍵」放在說明下方（英文行數較多，跟著往下）。
+	hintY := max(560, top+float64(len(lines)-1)*lineH+62)
+	ui.Text(screen, i18n.T("按任意鍵或點一下繼續　　Esc 結束", "Press any key or click to continue        Esc to quit"), cx, oy+hintY*s, 20*s, dimmed(ui.ColorDim, f), ui.Center)
 }
 
 // ── 播放 Burn-In ─────────────────────────────────────────

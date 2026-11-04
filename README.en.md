@@ -24,6 +24,7 @@ It also includes **test screens**: gray levels, single colors, near-black, gradi
 - **This program contains rapidly flashing images. Do not watch it if you have photosensitive epilepsy or are sensitive to flashing lights.** Avoid staring at the screen during playback.
 - **Real OLED burn-in is permanent panel aging and cannot be fixed by any image.** This tool may help reduce **temporary image retention** or wake up **stuck pixels**, but there is no guarantee.
 - Playing for a long time at maximum brightness puts extra load on the panel. Choose the playback time with care.
+- **Use at your own risk.** This tool is provided "as is" with no guarantee that it works. The author is not responsible for anything that happens after using it, including damage to your monitor or panel, worse image retention or burn-in, changes in brightness or color, data loss caused by the automatic shutdown, or physical discomfort. Read your monitor manufacturer's instructions first (many OLED monitors have a built-in pixel refresh feature, which manufacturers usually recommend using first).
 
 ## Screens
 
